@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "pystematic"
+version = "0.1.0"
+description = ""
+authors = ["Erik Valldor <erik.valldor@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = "^7.1.2"
+tqdm = "^4.48.2"
+tensorboardX = "^2.1"
+numpy = "^1.19.1"
+torch = "^1.7.0"
+torchvision = "^0.8.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+pylint = "^2.6.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
