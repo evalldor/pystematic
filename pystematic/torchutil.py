@@ -17,7 +17,7 @@ class DistributedSampler(torch.utils.data.distributed.Sampler):
         self.num_replicas = num_replicas
         self.rank = rank
         self.shuffle = shuffle
-        self.num_samples = int(math.ceil(len(self.dataset) * 1.0 / self.num_replicas))
+        self.num_samples = int(math.ceil(len(self.dataset) / self.num_replicas))
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
@@ -41,8 +41,12 @@ class DistributedSampler(torch.utils.data.distributed.Sampler):
 
 
 class Logger:
+    """Used for logging metrics during training and evaluation."""
 
     def __init__(self, log_dir=None, dummy=False):
+        """A dummy logger may be created when running distributed training, in
+        order to restrict logging to the master process."""
+
         self._scalars = {}
         self._figures = {}
         self._images = {}
@@ -124,6 +128,7 @@ class Logger:
 
     def commit(self):
         if not self._dummy:
+
             if self._log_to_tb:
                 for name, value in self._scalars.items():
                     self.get_tb_logger().add_scalar(name, value, self._global_step)
@@ -133,7 +138,9 @@ class Logger:
 
                 for name, value in self._images.items():
                     self.get_tb_logger().add_image(name, value, self._global_step)
+                
                 self.get_tb_logger().flush()
+            
             if self._log_to_console:
                 log_strings = [
                     "epoch: {}".format(self._epoch),

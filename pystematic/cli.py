@@ -114,12 +114,14 @@ def _continue_from_callback(ctx, param, dir_path):
         else:
             logger.warn(f"Could not find a checkpoint in directory '{dir_path}'.")
 
+
 def _find_config_file_in_dir(dir_path):
     config_path = os.path.join(dir_path, "config.json")
     if os.path.exists(config_path):
         return config_path
     
     return None
+
 
 def _find_latest_checkpoint_in_dir(dir_path):
     latest = -1
@@ -136,18 +138,66 @@ def _find_latest_checkpoint_in_dir(dir_path):
 
     return os.path.join(dir_path, "checkpoint-{}.ckpt".format(latest))
 
-@click.group()
-def experiments_main():
-    pass
 
-
-def _get_params(f):
+def _get_attached_click_parameters(f):
     if isinstance(f, click.Command):
         return f.params
     elif hasattr(f, "__click_params__"):
         return f.__click_params__
     
     return []
+
+
+@click.group()
+def global_entrypoint():
+    """All experiments are registered with this Click group. In your main
+    script, simply call this function to access the CLI for all registered
+    experiments.
+    """
+    pass
+
+
+def make_experiment_decorator(options, context):
+
+    def experiment_constructor(func=None, *, name=None, extends=None, defaults=None, **kwargs):
+
+        kwargs["context_settings"] = { # These are passed to the click Command class,
+            "default_map": defaults, 
+            "show_default": True
+        }
+
+        def decorator(func):
+            
+            experiment_name = name or func.__name__.lower().replace("_", "-")
+
+            @functools.wraps(func)
+            def command_wrapper(**config):
+                
+                config["_experiment_name"] = experiment_name
+                
+                ctx = context(config)
+
+                return func(ctx)
+
+            cmd = click.decorators._make_command(command_wrapper, experiment_name, attrs=kwargs, cls=Experiment)
+            
+            if extends is not None:
+                cmd.params += _get_attached_click_parameters(extends)
+
+            cmd.params += options
+
+            # Register the command with the global entrypoint.
+            global_entrypoint.add_command(cmd)
+
+            return cmd
+
+        if callable(func):
+            return decorator(func)
+        else:
+            return decorator
+
+    return experiment_constructor
+
 
 general_options = [
     Label("General"),
@@ -160,7 +210,10 @@ general_options = [
     ),
     click.Option(["--output-dir"],
         default="./output",
-        help="Directory to store all run-logs. Will be created if it does not exist.",
+        help=inspect.cleandoc(
+            """Parent directory to store all run-logs in. Will be created if it
+            does not exist."""
+        ),
         type=click.Path(file_okay=False),
         show_default=True,
         show_envvar=True
@@ -205,40 +258,6 @@ general_options = [
         hidden=True
     )
 ]
-
-def experiment(name=None, extends=None, defaults=None, **kwargs):
-
-    kwargs["context_settings"] = {
-        "default_map": defaults,
-        "show_default": True
-    }
-
-    def decorator(func):
-        @functools.wraps(func)
-        def command_wrapper(**config):
-            ctx = BasicContext(config)
-
-            return func(ctx)
-
-        cmd = click.decorators._make_command(command_wrapper, name, attrs=kwargs, cls=Experiment)
-        
-        if extends is not None:
-            cmd.params += _get_params(extends)
-
-        cmd.params += general_options
-
-        experiments_main.add_command(cmd)
-
-        return cmd
-
-    if callable(name):
-        func = name
-        name = None
-        return decorator(func)
-    
-    else:
-        return decorator
-
 
 pytorch_options = [
     Label("Training"),
@@ -332,37 +351,7 @@ pytorch_options = [
     )
 ]
 
-def pytorch_experiment(name=None, extends=None, defaults=None, **kwargs):
 
-    kwargs["context_settings"] = {
-        "default_map": defaults,
-        "show_default": True
-    }
-        
-    def decorator(func):
-        @functools.wraps(func)
-        def command_wrapper(**config):
-            ctx = PytorchContext(config)
+# experiment = make_experiment_decorator(general_options, BasicContext)
 
-            return func(ctx)
-
-        functools.update_wrapper(command_wrapper, func)
-
-        cmd = click.decorators._make_command(command_wrapper, name, attrs=kwargs, cls=Experiment)
-
-        if extends is not None:
-            cmd.params += _get_params(extends)
-
-        cmd.params += general_options + pytorch_options
-
-        experiments_main.add_command(cmd)
-
-        return cmd
-
-    if callable(name):
-        func = name
-        name = None
-        return decorator(func)
-    
-    else:
-        return decorator
+pytorch_experiment = make_experiment_decorator(general_options + pytorch_options, PytorchContext)

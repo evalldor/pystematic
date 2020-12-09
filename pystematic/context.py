@@ -7,6 +7,8 @@ import random
 import re
 import subprocess
 import sys
+import dataclasses
+import typing
 
 import click
 import numpy as np
@@ -15,6 +17,10 @@ import torch
 from .torchutil import Logger
 
 logger = logging.getLogger('Context')
+
+def _create_log_dir_name(output_dir, experiment_name):
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
 class BasicLogHandler(logging.Handler):
 
@@ -34,12 +40,6 @@ class BasicLogHandler(logging.Handler):
         name = click.style(f"[{record.name}]", fg="green")
 
         click.echo(f"{level} {name} {msg}")
-
-    
-def _create_log_dir_name(output_dir):
-    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    return pathlib.Path(output_dir).resolve().joinpath(current_time)
-
 
 class BasicContext:
 
@@ -92,7 +92,7 @@ class BasicContext:
             if self.config("internal_logdir") is not None:
                 self._output_dir = pathlib.Path(self.config("internal_logdir"))
             else:
-                self._output_dir = _create_log_dir_name(self.config("output_dir"))
+                self._output_dir = _create_log_dir_name(self.config("output_dir"), self.config("_experiment_name"))
                 
                 logger.info(f"Logdir is '{self._output_dir}'.")
                 
@@ -107,9 +107,61 @@ class BasicContext:
         """
         return self._random_gen.getrandbits(nbits)
 
-  
+
+
+def _launch_distributed_subprocesses(config, config_file, logdir):
+    logger.info("Launching distributed subprocesses...")
+
+    all_subprocesses = []
+    for local_rank in range(config["nproc_per_node"]):
+        
+        cmd = [sys.executable] + sys.argv[:]
+        cmd.append("--config-file")
+        cmd.append(str(config_file))
+        cmd.append("--internal-logdir")
+        cmd.append(str(logdir))
+        cmd.append("--local-rank")
+        cmd.append(str(local_rank))
+        
+        logger.debug(f"Executing '{' '.join(cmd)}'.")
+
+        process = subprocess.Popen(cmd, env=os.environ.copy())
+        all_subprocesses.append(process)
+    
+    logger.info(f"Launched '{len(all_subprocesses)}' subprocesses. Waiting for termination...")
+    
+    for process in all_subprocesses:
+        process.wait()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(returncode=process.returncode, cmd=sys.argv[:])
+
+def _config_dict_to_args(config):
+    """Converts a dict to a cmd option string"""
+    args = []
+
+    for key, value in config.items():
+        if value is not None:
+            args.append(f"--{key.replace('_', '-')}")
+            args.append(str(value))
+    
+    return args
+
+def _normalize_state_dict(state_dict):
+    """This removes any key prefixes inserted by DistributedDataParallel so that
+    a model can be loaded without running in distributed mode
+    """
+    new_dict = {}
+    for key, value in state_dict.items():
+        if key.startswith("module."):
+            new_key = re.sub(r"^module\.", "", key)
+            new_dict[new_key] = value
+        else:
+            new_dict[key] = value
+
+    return new_dict
 
 class PytorchLogHandler(logging.Handler):
+    """Handle logging for both single- and multiprocess contexts."""
 
     def __init__(self):
         super().__init__()
@@ -132,10 +184,29 @@ class PytorchLogHandler(logging.Handler):
         else:
             click.echo("{} {} {}".format(level, name, msg))
 
+
+@dataclasses.dataclass
+class ContextItem:
+    """Represents an item registered with a pytorch context. It is just a
+    wrapper around an object together with some configuration options."""
+    
+    handle: typing.Any # A handle to the actual item / object
+
+    cuda: bool # Can be used to disable cuda movement for specific items
+    checkpoint: bool # Set to False to exclude this item from being saved and loaded from checkpoints
+    
+
+
 class PytorchContext(BasicContext):
 
     def __init__(self, config):
         super().__init__(config, log_handlers=[PytorchLogHandler()])
+
+        if self.config("distributed") and self.config("local_rank") is None:
+            # Launch sub processes like in torch.distributed.launch
+            _launch_distributed_subprocesses(self.config(), self.config_file, self.output_dir)
+            exit(0)
+        
 
         self._items = {
             "global_step": 0,
@@ -145,13 +216,6 @@ class PytorchContext(BasicContext):
 
         self._checkpoint = {}
 
-        self._init()
-
-    def _init(self):
-        if self.config("distributed") and self.config("local_rank") is None:
-            # Launch sub processes like in torch.distributed.launch
-            _launch_distributed_subprocesses(self.config(), self.config_file, self.output_dir)
-            exit(0)
 
         if self.config("checkpoint") is not None:
             self.load_checkpoint(self.config("checkpoint"))
@@ -224,65 +288,37 @@ class PytorchContext(BasicContext):
     #
     # Items/Components
     #
-    def add(self, name, item, **kwargs):
-        if isinstance(item, torch.nn.Module) and not isinstance(item, torch.nn.modules.loss._Loss):
-            self.add_model(name, item, **kwargs)
-        else:
-            self.add_generic(name, item, **kwargs)
-    
-    def add_model(self, name, item, **kwargs):
-        self._assert_name_is_unique(name)
-        
-        if not isinstance(item, torch.nn.Module):
-            raise Exception(f"'{name}' is not an instance of torch.nn.Module")
-
-        logger.info(f"Registered model '{name}'.")
-
-        if name in self._checkpoint:
-            logger.info(f"Loading parameters from checkpoint for model '{name}'.")
-            item.load_state_dict(self._checkpoint[name])
-
-        if self.config("cuda"):
-            logger.info(f"Moving item '{name}' to CUDA.")
-            item = item.cuda()
-
-        if self.is_distributed():
-            
-            logger.info(f"Converting to distributed for model '{name}'.")
-
-            args = {
-                "broadcast_buffers": True
-            }
-
-            args.update(kwargs)
-            
-            item = torch.nn.parallel.DistributedDataParallel(
-                module=item,
-                device_ids=self.get_allocated_device_ids(),
-                output_device=self.get_allocated_device_ids()[0],
-                broadcast_buffers=args["broadcast_buffers"]
-            )
-        
-        self._items[name] = item
-
-    def add_generic(self, name, item, **kwargs):
-        self._assert_name_is_unique(name)
-        
-        logger.info(f"Registered '{name}'.")
-
-        if name in self._checkpoint:
-            logger.info(f"Loading parameters from checkpoint for '{name}'.")
-            item.load_state_dict(self._checkpoint[name])
-        
-        if self.config("cuda") and callable(getattr(item, "cuda", None)):
-            logger.info(f"Moving '{name}' to CUDA.")
-            item = item.cuda()
-        
-        self._items[name] = item
-
-    def _assert_name_is_unique(self, name):
+    def add(self, name, item, cuda=True, checkpoint=True, broadcast_buffers=True):
         if name in self._items.keys():
             raise Exception("Names need to be unique. Name '{}' already registered.".format(name))
+
+        if name in self._checkpoint:
+            if checkpoint:
+                logger.info(f"Loading parameters from checkpoint for '{name}'.")
+                item.load_state_dict(self._checkpoint[name])
+            else:
+                logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
+        
+        if self.config("cuda") and callable(getattr(item, "cuda", None)):
+            if cuda:
+                logger.info(f"Moving '{name}' to CUDA.")
+                item = item.cuda()
+            else:
+                logger.debug(f"Not moving item '{name}' to cuda due to item specific config.")
+        
+        
+        if isinstance(item, torch.nn.Module) and not isinstance(item, torch.nn.modules.loss._Loss):
+            if self.is_distributed():
+                logger.info(f"Converting to distributed for model '{name}'.")
+                
+                item = torch.nn.parallel.DistributedDataParallel(
+                    module=item,
+                    device_ids=self.get_allocated_device_ids(),
+                    output_device=self.get_allocated_device_ids()[0],
+                    broadcast_buffers=broadcast_buffers
+                )
+        
+        self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
 
     def has(self, name):
         return name in self._items.keys()
@@ -301,12 +337,16 @@ class PytorchContext(BasicContext):
     # Tasks
     #
     def step_global(self):
+        """Increases the 'global_step' counter by 1."""
         self._items["global_step"] += 1
 
     def step_epoch(self):
+        """Increases the 'epoch' counter by 1."""
         self._items["epoch"] += 1
 
     def place_on_correct_device(self, *args):
+        """Utility method to place a batch of data on the correct device (i.e.
+        cuda or cpu) depending on the 'cuda' config flag."""
         res = []
         for arg in args:
             if self.config("cuda") and callable(getattr(arg, "cuda", None)):
@@ -316,6 +356,7 @@ class PytorchContext(BasicContext):
         return res
     
     def seed_random_generators(self):
+        """This is just a helper to seed all known random modules with reproducible seeds."""
         self.seed_python_random_module()
         self.seed_pytorch_random_module()
         self.seed_numpy_random_module()
@@ -350,14 +391,24 @@ class PytorchContext(BasicContext):
                 "__torch_version": self.get("__torch_version")
             }
 
-            for name in self._items:
-                if callable(getattr(self._items[name], "state_dict", None)):
-                    dict_to_save[name] = _normalize_state_dict(self._items[name].state_dict())
+            for name, item in self._items.items():
+                if callable(getattr(item.handle, "state_dict", None)):
+                    if item.checkpoint:
+                        dict_to_save[name] = _normalize_state_dict(item.handle.state_dict())
+                    else:
+                        logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
 
             with checkpoint_file_path.open("wb") as f:
                 torch.save(dict_to_save, f)
 
     def load_checkpoint(self, checkpoint_file_path):
+        """Loads the checkpoint from the given filepath. Note that this method
+        does not actually populate the items with values, it just loads the
+        checkpoint into an internal dict. The actual population of the loaded
+        values is done when an item is registered with the context. It is
+        therefore required that the checkpoint be loaded BEFORE any item is
+        registered with the context."""
+
         logger.info(f"Loading checkpoint '{checkpoint_file_path}'.")
 
         with open(checkpoint_file_path, "rb") as f:
@@ -365,56 +416,3 @@ class PytorchContext(BasicContext):
 
         self._items["epoch"] = self._checkpoint["epoch"]
         self._items["global_step"] = self._checkpoint["global_step"]
-
-
-def _launch_distributed_subprocesses(config, config_file, logdir):
-    logger.info("Launching distributed subprocesses...")
-
-    all_subprocesses = []
-    for local_rank in range(config["nproc_per_node"]):
-        
-        cmd = [sys.executable] + sys.argv[:]
-        cmd.append("--config-file")
-        cmd.append(str(config_file))
-        cmd.append("--internal-logdir")
-        cmd.append(str(logdir))
-        cmd.append("--local-rank")
-        cmd.append(str(local_rank))
-        
-        logger.debug(f"Executing '{' '.join(cmd)}'.")
-
-        process = subprocess.Popen(cmd, env=os.environ.copy())
-        all_subprocesses.append(process)
-    
-    logger.info(f"Launched '{len(all_subprocesses)}' subprocesses. Waiting for termination...")
-    
-    for process in all_subprocesses:
-        process.wait()
-        if process.returncode != 0:
-            raise subprocess.CalledProcessError(returncode=process.returncode, cmd=sys.argv[:])
-
-def _config_dict_to_args(config):
-    """Converts a dict to a cmd option string"""
-    args = []
-
-    for key, value in config.items():
-        if value is not None:
-            args.append(f"--{key.replace('_', '-')}")
-            args.append(str(value))
-    
-    return args
-
-def _normalize_state_dict(state_dict):
-    """This removes any key prefixes inserted by DistributedDataParallel so that
-    a model can be loaded without running in distributed mode
-    """
-    new_dict = {}
-    for key, value in state_dict.items():
-        if key.startswith("module."):
-            new_key = re.sub(r"^module\.", "", key)
-            new_dict[new_key] = value
-        else:
-            new_dict[key] = value
-
-    return new_dict
-
