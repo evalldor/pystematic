@@ -43,16 +43,16 @@ class DistributedSampler(torch.utils.data.distributed.Sampler):
 class Logger:
     """Used for logging metrics during training and evaluation."""
 
-    def __init__(self, log_dir=None, dummy=False):
+    def __init__(self, log_dir=None, global_step_getter=None, epoch_getter=None, dummy=False):
         """A dummy logger may be created when running distributed training, in
         order to restrict logging to the master process."""
 
         self._scalars = {}
         self._figures = {}
         self._images = {}
-        self._global_step = -1
-        self._epoch = -1
         self._dummy = dummy
+        self._global_step_getter = global_step_getter
+        self._epoch_getter = epoch_getter
 
         self._log_dir = log_dir
         self._tb_logger = None #SummaryWriter(log_dir)
@@ -113,38 +113,32 @@ class Logger:
         
         self._images[tag] = img_grid
 
-    def global_step(self, global_step):
-        self._global_step = global_step
-
-    def epoch(self, epoch):
-        self._epoch = epoch
-
     def clear(self):
         self._scalars = {}
         self._figures = {}
         self._images = {}
-        self._global_step = -1
-        self._epoch = -1
 
     def commit(self):
         if not self._dummy:
+            global_step = self._global_step_getter()
+            epoch = self._epoch_getter()
 
             if self._log_to_tb:
                 for name, value in self._scalars.items():
-                    self.get_tb_logger().add_scalar(name, value, self._global_step)
+                    self.get_tb_logger().add_scalar(name, value, global_step)
 
                 for name, value in self._figures.items():
-                    self.get_tb_logger().add_figure(name, value, self._global_step, close=True)
+                    self.get_tb_logger().add_figure(name, value, global_step, close=True)
 
                 for name, value in self._images.items():
-                    self.get_tb_logger().add_image(name, value, self._global_step)
+                    self.get_tb_logger().add_image(name, value, global_step)
                 
                 self.get_tb_logger().flush()
             
             if self._log_to_console:
                 log_strings = [
-                    "epoch: {}".format(self._epoch),
-                    "global step: {}".format(self._global_step)
+                    "epoch: {}".format(epoch),
+                    "global step: {}".format(global_step)
                 ]
 
                 for name, value in self._scalars.items():
@@ -154,6 +148,7 @@ class Logger:
                 print("\n")
 
         self.clear()
+
 
 def _img_norm(img):
     max_val = np.amax(img)
@@ -165,18 +160,26 @@ def _img_norm(img):
 
 
 class Looper(abc.ABC):
+    """A utility class to help with looping over a dataset. You are expected to
+    subclass this class and override the desired methods.
+    `loop_step` is called once for each item yielded by the iterator.
+    
+    `before_loop` and `after_loop` are called before and after the iteration begins/ends.
 
+    A single iteration through the while iterator is done by calling the `loop_once` method.
+    """
     @abc.abstractmethod
     def get_iterator(self):
+        """Must return the iterator that should be looped over."""
         pass
 
-    def before(self):
+    def before_loop(self):
         pass
 
-    def after(self):
+    def after_loop(self):
         pass
 
-    def step(self, item, current_step, total_num_steps):
+    def loop_step(self, item, current_step, total_num_steps):
         pass
 
     def loop_once(self):
@@ -189,28 +192,28 @@ class Looper(abc.ABC):
     def _loop_once_with_progessbar(self):
         dataloader = self.get_iterator()
 
-        self.before()
+        self.before_loop()
 
         with tqdm.tqdm(dataloader, leave=True) as progress_bar:
             
             for curr_step, item in enumerate(progress_bar, 1):
-                message = self.step(item, curr_step, len(progress_bar))
+                message = self.loop_step(item, curr_step, len(progress_bar))
                 
                 if message is not None:
                     progress_bar.set_description(message)
 
-        self.after()
+        self.after_loop()
     
     def _loop_once_without_progessbar(self):
 
         dataloader = self.get_iterator()
 
-        self.before()
+        self.before_loop()
 
         for curr_step, item in enumerate(dataloader, 1):
-            self.step(item, curr_step, len(dataloader))
+            self.loop_step(item, curr_step, len(dataloader))
 
-        self.after()
+        self.after_loop()
 
 
 def create_sampler(dataset, shuffle=True, seed=0):

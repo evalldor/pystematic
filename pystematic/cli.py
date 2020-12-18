@@ -1,10 +1,12 @@
 import functools
 import inspect
-import json
 import logging
 import random
 import re
 import os
+import pathlib
+
+import yaml
 
 import click
 
@@ -13,16 +15,39 @@ from .context import BasicContext, PytorchContext
 
 logger = logging.getLogger("Cli")
 
-class Option(click.Option):
+
+def _param_memo(f, param):
+    if isinstance(f, click.Command):
+        f.params.append(param)
+    else:
+        if not hasattr(f, "__click_params__"):
+            f.__click_params__ = []
+        f.__click_params__.append(param)
+
+class Parameter(click.Option):
     """Extends the default click option with a flag for whether the option is
-    allowed to be loaded from config file.
+    allowed to be loaded from a parameters file.
     """
 
-    def __init__(self, param_decls=None, allow_from_cfgfile=True, **attrs):
-        super().__init__(param_decls, **attrs)
+    def __init__(self, *, name, allow_from_params_file=True, **attrs):
 
-        self.allow_from_cfgfile = allow_from_cfgfile
+        assert not "-" in name, "name cannot contain '-' characters. Use '_' instead!"
 
+        param_decls = f"--{name.lower().replace('_', '-')}"
+
+        super().__init__([param_decls], **attrs)
+
+        self.allow_from_params_file = allow_from_params_file
+
+
+
+def parameter_decorator(**attrs):
+
+    def decorator(func):
+        _param_memo(func, Parameter(**attrs))
+        return func
+
+    return decorator
 
 class Label(click.Option):
 
@@ -71,22 +96,27 @@ class Experiment(click.Command):
                         formatter.write_dl(opts[label], col_max=40)
 
 
-def _config_file_callback(ctx, param, file_path):
+def _params_file_callback(ctx, param, file_path):
 
     if file_path is not None:
         blacklisted_config_ops = []
 
         for param in ctx.command.params:
-            if hasattr(param, "allow_from_cfgfile") and not param.allow_from_cfgfile:
+            if hasattr(param, "allow_from_params_file") and not param.allow_from_params_file:
                 blacklisted_config_ops.append(param.name)
+        
+        file_path = pathlib.Path(file_path)
 
-        with open(file_path) as d:
-            cfg = json.load(d)
+        if not file_path.exists():
+            logger.warn(f"Could not find parameters file '{file_path}'.")
+        else:
+            with file_path.open("r") as f:
+                params_file = yaml.safe_load(f)
 
-        for key in blacklisted_config_ops:
-            cfg.pop(key, None)
+            for key in blacklisted_config_ops:
+                params_file.pop(key, None)
 
-        ctx.default_map.update(cfg)
+            ctx.default_map.update(params_file)
 
 
 def _help_callback(ctx, param, value):
@@ -99,12 +129,12 @@ def _help_callback(ctx, param, value):
 
 def _continue_from_callback(ctx, param, dir_path):
     if dir_path is not None:
-        cfg_file = _find_config_file_in_dir(dir_path)
+        cfg_file = _find_params_file_in_dir(dir_path)
 
         if cfg_file is not None:
-            _config_file_callback(ctx, "config_file", cfg_file)
+            _params_file_callback(ctx, "params_file", cfg_file)
         else:
-            logger.warn(f"Could not find a config file in directory '{dir_path}'.")
+            logger.warn(f"Could not find a parameters file in directory '{dir_path}'.")
         
         ckpt_file = _find_latest_checkpoint_in_dir(dir_path)
         if ckpt_file is not None:
@@ -115,8 +145,8 @@ def _continue_from_callback(ctx, param, dir_path):
             logger.warn(f"Could not find a checkpoint in directory '{dir_path}'.")
 
 
-def _find_config_file_in_dir(dir_path):
-    config_path = os.path.join(dir_path, "config.json")
+def _find_params_file_in_dir(dir_path):
+    config_path = os.path.join(dir_path, "parameters.yml")
     if os.path.exists(config_path):
         return config_path
     
@@ -150,6 +180,10 @@ def _get_attached_click_parameters(f):
 
 @click.group()
 def global_entrypoint():
+    """pystematic global entrypoint. Below is a list of all registered
+    experiments. Append the name of the experiment you would like to run to the
+    commandline you invoked to run this script.
+    """
     """All experiments are registered with this Click group. In your main
     script, simply call this function to access the CLI for all registered
     experiments.
@@ -159,7 +193,7 @@ def global_entrypoint():
 
 def make_experiment_decorator(options, context):
 
-    def experiment_constructor(func=None, *, name=None, extends=None, defaults=None, **kwargs):
+    def experiment_constructor(func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
 
         kwargs["context_settings"] = { # These are passed to the click Command class,
             "default_map": defaults, 
@@ -181,8 +215,8 @@ def make_experiment_decorator(options, context):
 
             cmd = click.decorators._make_command(command_wrapper, experiment_name, attrs=kwargs, cls=Experiment)
             
-            if extends is not None:
-                cmd.params += _get_attached_click_parameters(extends)
+            if inherit_params is not None:
+                cmd.params += _get_attached_click_parameters(inherit_params)
 
             cmd.params += options
 
@@ -231,12 +265,13 @@ general_options = [
         show_default=True,
         show_envvar=True
     ),
-    Option(['--config-file'],
+    Parameter(
+        name="params_file",
         type=click.Path(dir_okay=False),
         is_eager=True,
-        help="Read configuration from FILE.",
-        callback=_config_file_callback,
-        allow_from_cfgfile=False
+        help="Read experiment parameters from FILE.",
+        callback=_params_file_callback,
+        allow_from_params_file=False
     ),
     click.Option(["--random-seed"],
         default=functools.partial(random.getrandbits, 32),
@@ -246,36 +281,39 @@ general_options = [
     ),
     click.Option(["--comment"], 
         type=str,
-        help="A string comment to add to the config file for reference.",
+        help="A string comment to add to the parameters file for reference.",
         show_default=True,
         show_envvar=True
     ),
-    Option(["--internal-logdir"],
+    Parameter(
+        name="internal_logdir",
         default=None,
         help="Internally used to refer to an already created log dir. DO NOT USE MANUALLY.",
         type=click.Path(file_okay=False),
-        allow_from_cfgfile=False,
+        allow_from_params_file=False,
         hidden=True
     )
 ]
 
 pytorch_options = [
     Label("Training"),
-    Option(["--checkpoint"],
+    Parameter(
+        name="checkpoint",
         type=click.Path(dir_okay=False),
         help="Load context from checkpoint.",
         show_default=True,
         show_envvar=True,
-        allow_from_cfgfile=False
+        allow_from_params_file=False
     ),
-    Option(["--continue-from"],
+    Parameter(
+        name="continue_from",
         type=click.Path(file_okay=False),
         is_eager=True,
         callback=_continue_from_callback,
         help="Continue from the latest checkpoint found in dir.",
         show_default=True,
         show_envvar=True,
-        allow_from_cfgfile=False
+        allow_from_params_file=False
     ),
     click.Option(["--cuda/--nocuda"],
         default=True,
@@ -296,12 +334,13 @@ pytorch_options = [
         show_default=True,
         show_envvar=True
     ),
-    Option(["--local-rank"], 
+    Parameter(
+        name="local_rank", 
         type=int,
         help="For distributed training, gives the local rank for this process.",
         show_default=True,
         show_envvar=True,
-        allow_from_cfgfile=False
+        allow_from_params_file=False
     ),
     click.Option(["--nproc-per-node"],
         envvar="NPROC_PER_NODE", 
@@ -314,14 +353,15 @@ pytorch_options = [
         show_default=True,
         show_envvar=True
     ),
-    Option(["--node-rank"], 
+    Parameter(
+        name="node_rank", 
         envvar="NODE_RANK",
         type=int, 
         default=0,
         help="The rank of the node for multi-node distributed training.",
         show_default=True,
         show_envvar=True,
-        allow_from_cfgfile=False
+        allow_from_params_file=False
     ),
     click.Option(["--nnodes"], 
         envvar="NNODES",

@@ -1,11 +1,11 @@
 *A collection of tools that helps you to systematically setup and run reproducible experiments in pytorch.*
 
 CLI
-Build on Click
+Builds on Click
 Define experiment.
 Define args.
 global_entrypoint
-Run script
+running experiments
 
 
 Context
@@ -17,7 +17,9 @@ Examples in script
 
 
 Reproducibility
-random seed
+"One seed to rule them all"
+random seed, seeding you random number generators
+pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
 
 
 Training
@@ -25,6 +27,7 @@ Looper (optional)
 
 
 Logging
+wrapped because of transparency for distributed training
 Backends
 adding and commiting.
 gobal_step required (= x-axis in all data charts)
@@ -37,7 +40,6 @@ default args
 context helper methods
 idendical random seeds
 
-pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
 
 
 
@@ -46,3 +48,6 @@ All experiments are registered with pystematic.global_entrypoint
 ```
 
 ```
+
+
+config -> parameters
