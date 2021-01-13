@@ -163,16 +163,16 @@ class PytorchLogHandler(logging.Handler):
         }
 
     def handle(self, record):
-        level = click.style("[{}]".format(record.levelname), fg=self._colors[record.levelname])  
-        msg = click.style("{}".format(record.getMessage()), fg="white")
+        level = click.style(f"[{record.levelname}]", fg=self._colors[record.levelname])  
+        msg = click.style(f"{record.getMessage()}", fg="white")
 
-        name = click.style("[{}]".format(record.name), fg="green")
+        name = click.style(f"[{record.name}]", fg="green")
         
         if torch.distributed.is_initialized():
             rank = click.style(f"[RANK {torch.distributed.get_rank()}]", fg="green")
-            click.echo("{} {} {} {}".format(level, rank, name, msg))
+            click.echo(f"{level} {rank} {name} {msg}")
         else:
-            click.echo("{} {} {}".format(level, name, msg))
+            click.echo(f"{level} {name} {msg}")
 
 
 @dataclasses.dataclass
@@ -188,6 +188,7 @@ class ContextItem:
 
 
 class PytorchContext(BasicContext):
+
 
     def __init__(self, params):
         super().__init__(params, log_handlers=[PytorchLogHandler()])
@@ -339,7 +340,7 @@ class PytorchContext(BasicContext):
 
     def place_on_correct_device(self, *args):
         """Utility method to place a batch of data on the correct device (i.e.
-        cuda or cpu) depending on the 'cuda' config flag."""
+        cuda or cpu) depending on the 'cuda' experiment parameter."""
         res = []
         for arg in args:
             if self.param("cuda") and callable(getattr(arg, "cuda", None)):
@@ -361,7 +362,7 @@ class PytorchContext(BasicContext):
     # Checkpoint
     #
     def save_checkpoint(self, suffix=None):
-        """Saves registered items to a file. All items that have a functionnamed
+        """Saves registered items to a file. All items that have a function named
         'state_dict' will be saved by calling that function and saving the
         returned value.
 
