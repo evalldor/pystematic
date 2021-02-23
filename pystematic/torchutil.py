@@ -113,6 +113,9 @@ class Logger:
         
         self._images[tag] = img_grid
 
+    def figure(self, tag, fig):
+        self._figures[tag] = fig
+
     def clear(self):
         self._scalars = {}
         self._figures = {}
