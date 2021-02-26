@@ -43,7 +43,7 @@ class DistributedSampler(torch.utils.data.distributed.Sampler):
 class Logger:
     """Used for logging metrics during training and evaluation."""
 
-    def __init__(self, log_dir=None, global_step_getter=None, epoch_getter=None, dummy=False):
+    def __init__(self, log_dir=None, global_step_getter=None, epoch_getter=None, dummy=False, prefix=None):
         """A dummy logger may be created when running distributed training, in
         order to restrict logging to the master process."""
 
@@ -51,6 +51,7 @@ class Logger:
         self._figures = {}
         self._images = {}
         self._dummy = dummy
+        self._prefix = prefix
         self._global_step_getter = global_step_getter
         self._epoch_getter = epoch_getter
 
@@ -60,6 +61,12 @@ class Logger:
 
         self._log_to_tb = True
         self._log_to_console = False
+
+    def _make_tag(self, tag):
+        if self._prefix is not None:
+            tag = f"{self._prefix}/{tag}"
+        
+        return tag
 
     def get_tb_logger(self):
         if self._tb_logger is None:
@@ -79,8 +86,8 @@ class Logger:
     def scalar(self, tag, scalar):
         if torch.is_tensor(scalar):
             scalar = scalar.cpu().item()
-
-        self._scalars[tag] = scalar
+        
+        self._scalars[self._make_tag(tag)] = scalar
 
     def image_grid(self, tag, images):
         
@@ -111,10 +118,10 @@ class Logger:
 
         img_grid = np.concatenate(all_rows, axis=1)
         
-        self._images[tag] = img_grid
+        self._images[self._make_tag(tag)] = img_grid
 
     def figure(self, tag, fig):
-        self._figures[tag] = fig
+        self._figures[self._make_tag(tag)] = fig
 
     def clear(self):
         self._scalars = {}

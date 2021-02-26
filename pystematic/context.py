@@ -137,30 +137,27 @@ class ContextItem:
 
     cuda: bool = True # Can be used to disable cuda movement for specific items
     checkpoint: bool = True # Set to False to exclude this item from being saved and loaded from checkpoints
-    
+
+@dataclasses.dataclass
+class RecorderWrapper:
+    handle: typing.Any # A handle to the actual item / object
+
+    checkpoint: bool = True # Set to False to exclude this item from being saved and loaded from checkpoints
 
 
+class Recorder:
 
-
-class PytorchSubContext(BasicContext):
-
-
-    def __init__(self, experiment, checkpoint={}):
-        super().__init__(experiment)
-        
-        self._items = {}
-
+    def __init__(self, output_dir, dummy, logger_prefix):
         self._global_step = 0
         self._epoch = 0
-        self._checkpoint = checkpoint
 
         self._logger = Logger(
-            log_dir=str(self.output_dir), 
+            log_dir=str(output_dir), 
             global_step_getter=lambda: self._global_step,
             epoch_getter=lambda: self._epoch,
-            dummy=(not self.is_master())
+            dummy=dummy,
+            prefix=logger_prefix
         )
-
     
     @property
     def global_step(self):
@@ -173,6 +170,97 @@ class PytorchSubContext(BasicContext):
     @property
     def logger(self):
         return self._logger
+    
+    def step_global(self):
+        """Increases the 'global_step' counter by 1."""
+        self._global_step += 1
+
+    def step_epoch(self):
+        """Increases the 'epoch' counter by 1."""
+        self._epoch += 1
+
+    def get_state(self):
+        return {
+            "global_step": self._global_step,
+            "epoch": self._epoch
+        }
+
+    def set_state(self, state):
+        self._global_step = state["global_step"]
+        self._epoch = state["epoch"]
+
+    def reset(self):
+        self._global_step = 0
+        self._epoch = 0
+
+class PytorchContext(BasicContext):
+
+    def __init__(self, experiment):
+        BasicContext.__init__(self, experiment)
+        
+        logging.basicConfig(level=self.param("log_level"), handlers=[PytorchLogHandler()])
+
+        logger.info(f"Output dir is '{self.output_dir}'.")
+
+        if self.param("distributed") and self.param("local_rank") is None:
+            # Launch sub processes like in torch.distributed.launch
+            _launch_distributed_subprocesses(self.param(), self.params_file, self.output_dir)
+            exit(0)
+        
+        if self.param("distributed") and self.param("local_rank") is not None:
+            global_rank = self.param("nproc_per_node") * self.param("node_rank") + self.param("local_rank")
+            world_size = self.param("nproc_per_node") * self.param("nnodes")
+
+            logger.info(f"Initializing distributed runtime (world size '{world_size}', local rank '{self.param('local_rank')}', global rank '{global_rank}')...")
+            
+            torch.cuda.set_device(self.param("local_rank"))
+            
+            torch.distributed.init_process_group(
+                backend='nccl',
+                init_method="tcp://{}:{}".format(self.param("master_addr"), self.param("master_port")),
+                world_size=world_size,
+                rank=global_rank
+            )
+
+            logger.info(f"Distributed runtime initialized. World size is '{torch.distributed.get_world_size()}'.")
+
+        self._checkpoint = {
+            "items": {},
+            "recorders": {}
+        }
+
+        if self.param("checkpoint") is not None:
+            self.load_checkpoint(self.param("checkpoint"))
+
+        self._items = {}
+        self._recorders = {
+            "global": Recorder(self.output_dir, (not self.is_master), None)
+        }
+
+        if "global" in self._checkpoint["recorders"]:
+            self._recorders["global"].set_state(self._checkpoint["recorders"]["global"])
+ 
+
+    @property
+    def global_step(self):
+        return self._recorders["global"].global_step
+
+    @property
+    def epoch(self):
+        return self._recorders["global"].epoch
+
+    @property
+    def logger(self):
+        return self._recorders["global"].logger
+    
+    def step_global(self):
+        """Increases the 'global_step' counter by 1."""
+        self._recorders["global"].step_global()
+
+    def step_epoch(self):
+        """Increases the 'epoch' counter by 1."""
+        self._recorders["global"].step_epoch()
+    
 
     #
     # Distributed
@@ -216,14 +304,15 @@ class PytorchSubContext(BasicContext):
     #
     # Items/Components
     #
-    def add(self, name, item, cuda=True, checkpoint=True, broadcast_buffers=True):
-        if name in self._items.keys():
-            raise Exception("Names need to be unique. Name '{}' already registered.".format(name))
 
-        if name in self._checkpoint:
+    def add(self, name, item, cuda=True, checkpoint=True, broadcast_buffers=True):
+        # if name in self._items.keys():
+        #     raise Exception("Names need to be unique. Name '{}' already registered.".format(name))
+
+        if name in self._checkpoint["items"]:
             if checkpoint:
                 logger.info(f"Loading parameters from checkpoint for '{name}'.")
-                item.load_state_dict(self._checkpoint[name])
+                item.load_state_dict(self._checkpoint["items"][name])
             else:
                 logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
         
@@ -257,17 +346,20 @@ class PytorchSubContext(BasicContext):
 
         return self._items[name].handle
 
+    def recorder(self, name, checkpoint=True):
+        if name not in self._recorders:
+            recorder = Recorder(self.output_dir, (not self.is_master), name)
+
+            if checkpoint and name in self._checkpoint["recorders"]:
+                recorder.set_state(self._checkpoint["recorders"][name])
+
+            self._recorders[name] = RecorderWrapper(handle=recorder, checkpoint=checkpoint)
+
+        return self._recorders[name].handle
+
     #
     # Tasks
     #
-
-    def step_global(self):
-        """Increases the 'global_step' counter by 1."""
-        self._global_step += 1
-
-    def step_epoch(self):
-        """Increases the 'epoch' counter by 1."""
-        self._epoch += 1
 
     def place_on_correct_device(self, *args):
         """Utility method to place a batch of data on the correct device (i.e.
@@ -280,45 +372,6 @@ class PytorchSubContext(BasicContext):
                 res.append(arg)
         return res
     
-
-    #
-    # Checkpoint
-    #
-
-class PytorchContext(PytorchSubContext):
-
-    def __init__(self, experiment):
-        super().__init__(experiment)
-        
-        if self.param("distributed") and self.param("local_rank") is None:
-            # Launch sub processes like in torch.distributed.launch
-            _launch_distributed_subprocesses(self.param(), self.params_file, self.output_dir)
-            exit(0)
-        
-        logging.basicConfig(level=self.param("log_level"), handlers=[PytorchLogHandler()])
-
-        logger.info(f"Output dir is '{self.output_dir}'.")
-
-        if self.param("checkpoint") is not None:
-            self.load_checkpoint(self.param("checkpoint"))
-
-        if self.param("distributed") and self.param("local_rank") is not None:
-            global_rank = self.param("nproc_per_node") * self.param("node_rank") + self.param("local_rank")
-            world_size = self.param("nproc_per_node") * self.param("nnodes")
-
-            logger.info(f"Initializing distributed runtime (world size '{world_size}', local rank '{self.param('local_rank')}', global rank '{global_rank}')...")
-            
-            torch.cuda.set_device(self.param("local_rank"))
-            
-            torch.distributed.init_process_group(
-                backend='nccl',
-                init_method="tcp://{}:{}".format(self.param("master_addr"), self.param("master_port")),
-                world_size=world_size,
-                rank=global_rank
-            )
-
-            logger.info(f"Distributed runtime initialized. World size is '{torch.distributed.get_world_size()}'.")
-    
     def seed_random_generators(self):
         """This is just a helper to seed all known random modules with reproducible seeds."""
         
@@ -327,6 +380,10 @@ class PytorchContext(PytorchSubContext):
         random.seed(self.new_seed())
         torch.manual_seed(self.new_seed())
         np.random.seed(self.new_seed())
+
+    #
+    # Checkpoint
+    #
 
     def save_checkpoint(self, suffix=None):
         """Saves registered items to a file. All items that have a function named
@@ -346,20 +403,24 @@ class PytorchContext(PytorchSubContext):
             logger.info(f"Saving checkpoint '{checkpoint_file_path}'.")
 
             dict_to_save = {
-                "epoch": self.epoch,
-                "global_step": self.global_step,
-                "__torch_version": torch.__version__
+                "__torch_version": torch.__version__,
+                "items": {},
+                "recorders": {}
             }
 
             for name, item in self._items.items():
                 if callable(getattr(item.handle, "state_dict", None)):
                     if item.checkpoint:
                         if isinstance(item.handle, torch.nn.parallel.DistributedDataParallel):
-                            dict_to_save[name] = _normalize_state_dict(item.handle.state_dict())
+                            dict_to_save["items"][name] = _normalize_state_dict(item.handle.state_dict())
                         else:
-                            dict_to_save[name] = item.handle.state_dict()
+                            dict_to_save["items"][name] = item.handle.state_dict()
                     else:
                         logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
+
+            for name, recorder in self._recorders.items():
+                if recorder.checkpoint:
+                    dict_to_save["recorders"][name] = recorder.handle.get_state()
 
             with checkpoint_file_path.open("wb") as f:
                 torch.save(dict_to_save, f)
@@ -376,7 +437,4 @@ class PytorchContext(PytorchSubContext):
 
         with open(checkpoint_file_path, "rb") as f:
             self._checkpoint = torch.load(f, map_location="cpu")
-
-        self._epoch = self._checkpoint["epoch"]
-        self._global_step = self._checkpoint["global_step"]
-
+        
