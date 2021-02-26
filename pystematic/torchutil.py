@@ -203,7 +203,11 @@ class Looper(abc.ABC):
                 message = self.loop_step(item, curr_step, len(progress_bar))
                 
                 if message is not None:
-                    progress_bar.set_description(message)
+                    if isinstance(message, str):
+                        progress_bar.set_description(message)
+                    elif isinstance(message, dict):
+                        progress_bar.set_description(", ".join([f"{name}: {value}" for name, value in message.items()]))
+
 
         self.after_loop()
     
@@ -243,7 +247,9 @@ def create_sampler(dataset, shuffle=True, seed=0):
 
 
 class BetterDistributedSampler(torch.utils.data.distributed.DistributedSampler):
-
+    """This class extends torch's default DistributedSampler but removed the need
+    for manually calling the set_epoch method to reseed the random sampler
+    """
     def __init__(self, dataset, shuffle=True, seed=0):
         super().__init__(dataset, shuffle=shuffle, seed=seed)
         self.epoch = 0
