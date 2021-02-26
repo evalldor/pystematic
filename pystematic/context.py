@@ -77,7 +77,7 @@ class BasicContext:
         if name in self._params:
             return self._params[name]
         
-        return default
+        raise f"Parameter with name '{name}' does not exist!"
 
     @property
     def params_file(self):
