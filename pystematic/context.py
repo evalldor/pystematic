@@ -67,7 +67,7 @@ class BasicContext:
             with self.params_file.open("w") as f:
                 yaml.dump(self.param(), f, default_flow_style=False)
 
-    def param(self, name=None):
+    def param(self, name : str = None):
         """Returns the value of the parameter with name `name`. If name is `None`
         the whole parameters dict is returned.
         """
@@ -80,11 +80,11 @@ class BasicContext:
         raise f"Parameter with name '{name}' does not exist!"
 
     @property
-    def params_file(self):
+    def params_file(self) -> pathlib.Path:
         return self.output_dir.joinpath("parameters.yml")
 
     @property
-    def output_dir(self):
+    def output_dir(self) -> pathlib.Path:
         """Returns the path to the directory where all output files should be
         saved. The path is wrapped in a `pathlib.Path` object.
         """
@@ -100,9 +100,9 @@ class BasicContext:
 
         return self._output_dir
 
-    def new_seed(self, nbits=32):
-        """Use this function to generate random numbers seeded by the config
-        value `random_seed`. Expected use is to seed your own random number
+    def new_seed(self, nbits=32) -> int:
+        """Use this function to generate random numbers seeded by the experiment
+        parameter `random_seed`. Expected use is to seed your own random number
         generators.
         """
         return self._random_gen.getrandbits(nbits)
@@ -303,7 +303,7 @@ class PytorchContext(BasicContext):
                 logger.debug(f"Not moving item '{name}' to cuda due to item specific config.")
         
         
-        if isinstance(item, torch.nn.Module) and not isinstance(item, torch.nn.modules.loss._Loss):
+        if isinstance(item, torch.nn.Module) and len([*item.parameters()]) > 0:
             if self.is_distributed():
                 logger.info(f"Converting to distributed for model '{name}'.")
                 
