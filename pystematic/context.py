@@ -23,89 +23,43 @@ def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
-class BasicLogHandler(logging.Handler):
 
-    def __init__(self):
-        super().__init__()
-        self._colors = {
-            'DEBUG':    'magenta',
-            'INFO':     'blue',
-            'WARNING':  'yellow',
-            'ERROR':    'red'
-        }
 
-    def handle(self, record):
-        level = click.style(f"[{record.levelname}]", fg=self._colors[record.levelname])  
-        msg = click.style(f"{record.getMessage()}", fg="white")
-
-        name = click.style(f"[{record.name}]", fg="green")
-
-        click.echo(f"{level} {name} {msg}")
 
 class BasicContext:
 
-    def __init__(self, params, log_handlers=[BasicLogHandler()]):
-        self._params = params
-        self._output_dir = None
-
-        # Log level
-        if self.param("debug"):
-            self._params.update({
-                "log_level": "DEBUG"
-            })
-
-        logging.basicConfig(level=self.param("log_level"), handlers=log_handlers)
-
-        # Random gen
-        if "random_seed" not in params or params["random_seed"] is None:
-            self._params["random_seed"] = random.getrandbits(32)
-
-        self._random_gen = random.Random(self._params["random_seed"])
-
-        if not self.params_file.exists():
-            logger.info(f"Writing parameters file to '{self.params_file}'.")
-            with self.params_file.open("w") as f:
-                yaml.dump(self.param(), f, default_flow_style=False)
+    def __init__(self, experiment):
+        self._experiment = experiment
 
     def param(self, name : str = None):
         """Returns the value of the parameter with name `name`. If name is `None`
         the whole parameters dict is returned.
         """
         if name is None:
-            return self._params.copy()
+            return self._experiment.parameters.copy()
         
-        if name in self._params:
-            return self._params[name]
+        if name in self._experiment.parameters:
+            return self._experiment.parameters[name]
         
         raise f"Parameter with name '{name}' does not exist!"
 
     @property
     def params_file(self) -> pathlib.Path:
-        return self.output_dir.joinpath("parameters.yml")
+        return self._experiment.output_dir.joinpath("parameters.yml")
 
     @property
     def output_dir(self) -> pathlib.Path:
         """Returns the path to the directory where all output files should be
         saved. The path is wrapped in a `pathlib.Path` object.
         """
-        if self._output_dir is None:
-            if self.param("internal_logdir") is not None:
-                self._output_dir = pathlib.Path(self.param("internal_logdir"))
-            else:
-                self._output_dir = _create_log_dir_name(self.param("output_dir"), self.param("_experiment_name"))
-                
-                logger.info(f"Logdir is '{self._output_dir}'.")
-                
-                self._output_dir.mkdir(parents=True, exist_ok=True)
-
-        return self._output_dir
+        return self._experiment.output_dir
 
     def new_seed(self, nbits=32) -> int:
         """Use this function to generate random numbers seeded by the experiment
         parameter `random_seed`. Expected use is to seed your own random number
         generators.
         """
-        return self._random_gen.getrandbits(nbits)
+        return self._experiment.random_generator.getrandbits(nbits)
 
 
 
@@ -186,22 +140,19 @@ class ContextItem:
     
 
 
-class PytorchContext(BasicContext):
 
 
-    def __init__(self, params):
-        super().__init__(params, log_handlers=[PytorchLogHandler()])
+class PytorchSubContext(BasicContext):
 
-        if self.param("distributed") and self.param("local_rank") is None:
-            # Launch sub processes like in torch.distributed.launch
-            _launch_distributed_subprocesses(self.param(), self.params_file, self.output_dir)
-            exit(0)
 
+    def __init__(self, experiment, checkpoint={}):
+        super().__init__(experiment)
+        
         self._items = {}
 
         self._global_step = 0
         self._epoch = 0
-        self._checkpoint = {}
+        self._checkpoint = checkpoint
 
         self._logger = Logger(
             log_dir=str(self.output_dir), 
@@ -210,25 +161,6 @@ class PytorchContext(BasicContext):
             dummy=(not self.is_master())
         )
 
-        if self.param("checkpoint") is not None:
-            self.load_checkpoint(self.param("checkpoint"))
-
-        if self.param("distributed") and self.param("local_rank") is not None:
-            global_rank = self.param("nproc_per_node") * self.param("node_rank") + self.param("local_rank")
-            world_size = self.param("nproc_per_node") * self.param("nnodes")
-
-            logger.info(f"Initializing distributed runtime (world size '{world_size}', local rank '{self.param('local_rank')}', global rank '{global_rank}')...")
-            
-            torch.cuda.set_device(self.param("local_rank"))
-            
-            torch.distributed.init_process_group(
-                backend='nccl',
-                init_method="tcp://{}:{}".format(self.param("master_addr"), self.param("master_port")),
-                world_size=world_size,
-                rank=global_rank
-            )
-
-            logger.info(f"Distributed runtime initialized. World size is '{torch.distributed.get_world_size()}'.")
     
     @property
     def global_step(self):
@@ -348,6 +280,45 @@ class PytorchContext(BasicContext):
                 res.append(arg)
         return res
     
+
+    #
+    # Checkpoint
+    #
+
+class PytorchContext(PytorchSubContext):
+
+    def __init__(self, experiment):
+        super().__init__(experiment)
+        
+        if self.param("distributed") and self.param("local_rank") is None:
+            # Launch sub processes like in torch.distributed.launch
+            _launch_distributed_subprocesses(self.param(), self.params_file, self.output_dir)
+            exit(0)
+        
+        logging.basicConfig(level=self.param("log_level"), handlers=[PytorchLogHandler()])
+
+        logger.info(f"Output dir is '{self.output_dir}'.")
+
+        if self.param("checkpoint") is not None:
+            self.load_checkpoint(self.param("checkpoint"))
+
+        if self.param("distributed") and self.param("local_rank") is not None:
+            global_rank = self.param("nproc_per_node") * self.param("node_rank") + self.param("local_rank")
+            world_size = self.param("nproc_per_node") * self.param("nnodes")
+
+            logger.info(f"Initializing distributed runtime (world size '{world_size}', local rank '{self.param('local_rank')}', global rank '{global_rank}')...")
+            
+            torch.cuda.set_device(self.param("local_rank"))
+            
+            torch.distributed.init_process_group(
+                backend='nccl',
+                init_method="tcp://{}:{}".format(self.param("master_addr"), self.param("master_port")),
+                world_size=world_size,
+                rank=global_rank
+            )
+
+            logger.info(f"Distributed runtime initialized. World size is '{torch.distributed.get_world_size()}'.")
+    
     def seed_random_generators(self):
         """This is just a helper to seed all known random modules with reproducible seeds."""
         
@@ -357,9 +328,6 @@ class PytorchContext(BasicContext):
         torch.manual_seed(self.new_seed())
         np.random.seed(self.new_seed())
 
-    #
-    # Checkpoint
-    #
     def save_checkpoint(self, suffix=None):
         """Saves registered items to a file. All items that have a function named
         'state_dict' will be saved by calling that function and saving the
@@ -411,3 +379,4 @@ class PytorchContext(BasicContext):
 
         self._epoch = self._checkpoint["epoch"]
         self._global_step = self._checkpoint["global_step"]
+

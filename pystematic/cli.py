@@ -5,6 +5,9 @@ import random
 import re
 import os
 import pathlib
+import datetime
+import dataclasses
+import typing
 
 import yaml
 
@@ -191,6 +194,36 @@ def global_entrypoint():
     pass
 
 
+def _create_log_dir_name(output_dir, experiment_name):
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
+
+@dataclasses.dataclass
+class ExperimentContext:
+    parameters: typing.Dict[str, typing.Any]
+    output_dir: pathlib.Path
+    random_generator: random.Random
+
+class BasicLogHandler(logging.Handler):
+
+    def __init__(self):
+        super().__init__()
+        self._colors = {
+            'DEBUG':    'magenta',
+            'INFO':     'blue',
+            'WARNING':  'yellow',
+            'ERROR':    'red'
+        }
+
+    def handle(self, record):
+        level = click.style(f"[{record.levelname}]", fg=self._colors[record.levelname])  
+        msg = click.style(f"{record.getMessage()}", fg="white")
+
+        name = click.style(f"[{record.name}]", fg="green")
+
+        click.echo(f"{level} {name} {msg}")
+
+
 def make_experiment_decorator(options, context):
 
     def experiment_constructor(func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
@@ -205,11 +238,41 @@ def make_experiment_decorator(options, context):
             experiment_name = name or func.__name__.lower().replace("_", "-")
 
             @functools.wraps(func)
-            def command_wrapper(**config):
+            def command_wrapper(**params):
                 
-                config["_experiment_name"] = experiment_name
+                params["_experiment_name"] = experiment_name
+
+                if params["debug"]:
+                    params.update({
+                        "log_level": "DEBUG"
+                    })
+
+                logging.basicConfig(level=params["log_level"], handlers=[BasicLogHandler()])
                 
-                ctx = context(config)
+                if "random_seed" not in params or params["random_seed"] is None:
+                    params["random_seed"] = random.getrandbits(32)
+
+                random_gen = random.Random(params["random_seed"])
+
+                if params["internal_logdir"] is not None:
+                    output_dir = pathlib.Path(params["internal_logdir"])
+                else:
+                    output_dir = _create_log_dir_name(params["output_dir"], params["_experiment_name"])
+                    output_dir.mkdir(parents=True, exist_ok=True)
+
+                params_file = output_dir.joinpath("parameters.yml")
+
+                if not params_file.exists():
+                    with params_file.open("w") as f:
+                        yaml.dump(params, f, default_flow_style=False)
+
+                experiment = ExperimentContext(
+                    parameters=params, 
+                    output_dir=output_dir, 
+                    random_generator=random_gen
+                )
+
+                ctx = context(experiment)
 
                 return func(ctx)
 
