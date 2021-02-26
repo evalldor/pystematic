@@ -67,10 +67,9 @@ class BasicContext:
             with self.params_file.open("w") as f:
                 yaml.dump(self.param(), f, default_flow_style=False)
 
-    def param(self, name=None, default=None):
+    def param(self, name=None):
         """Returns the value of the parameter with name `name`. If name is `None`
-        the whole parameters dict is returned. If an item `name` does not exist it
-        returns the value of `default`.
+        the whole parameters dict is returned.
         """
         if name is None:
             return self._params.copy()
