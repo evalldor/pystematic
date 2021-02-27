@@ -15,7 +15,7 @@ import click
 import numpy as np
 import torch
 
-from .torchutil import Logger
+from .recording import Recorder
 
 logger = logging.getLogger('Context')
 
@@ -24,42 +24,89 @@ def _create_log_dir_name(output_dir, experiment_name):
     return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
 
+class BasicLogHandler(logging.Handler):
+
+    def __init__(self):
+        super().__init__()
+        self._colors = {
+            'DEBUG':    'magenta',
+            'INFO':     'blue',
+            'WARNING':  'yellow',
+            'ERROR':    'red'
+        }
+
+    def handle(self, record):
+        level = click.style(f"[{record.levelname}]", fg=self._colors[record.levelname])  
+        msg = click.style(f"{record.getMessage()}", fg="white")
+
+        name = click.style(f"[{record.name}]", fg="green")
+
+        click.echo(f"{level} {name} {msg}")
+
 
 
 class BasicContext:
 
-    def __init__(self, experiment):
-        self._experiment = experiment
+    def __init__(self, params):
+
+        if params["debug"]:
+            params.update({
+                "log_level": "DEBUG"
+            })
+
+        logging.basicConfig(level=params["log_level"], handlers=[BasicLogHandler()])
+        
+        if "random_seed" not in params or params["random_seed"] is None:
+            params["random_seed"] = random.getrandbits(32)
+
+        if params["internal_logdir"] is not None:
+            output_dir = pathlib.Path(params["internal_logdir"])
+        else:
+            output_dir = _create_log_dir_name(params["output_dir"], params["_experiment_name"])
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+        params_file = output_dir.joinpath("parameters.yml")
+
+        logger.info(f"Output dir is '{output_dir}'.")
+
+        if not params_file.exists():
+            logger.info(f"Writing parameters file to '{output_dir}'.")
+            with params_file.open("w") as f:
+                yaml.dump(params, f, default_flow_style=False)
+
+        self._params = params
+        self._random_generator = random.Random(params["random_seed"])
+        self._output_dir = output_dir
 
     def param(self, name : str = None):
         """Returns the value of the parameter with name `name`. If name is `None`
         the whole parameters dict is returned.
         """
         if name is None:
-            return self._experiment.parameters.copy()
+            return self._params.copy()
         
-        if name in self._experiment.parameters:
-            return self._experiment.parameters[name]
+        if name in self._params:
+            return self._params[name]
         
         raise f"Parameter with name '{name}' does not exist!"
 
     @property
     def params_file(self) -> pathlib.Path:
-        return self._experiment.output_dir.joinpath("parameters.yml")
+        return self._output_dir.joinpath("parameters.yml")
 
     @property
     def output_dir(self) -> pathlib.Path:
         """Returns the path to the directory where all output files should be
         saved. The path is wrapped in a `pathlib.Path` object.
         """
-        return self._experiment.output_dir
+        return self._output_dir
 
     def new_seed(self, nbits=32) -> int:
         """Use this function to generate random numbers seeded by the experiment
         parameter `random_seed`. Expected use is to seed your own random number
         generators.
         """
-        return self._experiment.random_generator.getrandbits(nbits)
+        return self._random_generator.getrandbits(nbits)
 
 
 
@@ -138,69 +185,13 @@ class ContextItem:
     cuda: bool = True # Can be used to disable cuda movement for specific items
     checkpoint: bool = True # Set to False to exclude this item from being saved and loaded from checkpoints
 
-@dataclasses.dataclass
-class RecorderWrapper:
-    handle: typing.Any # A handle to the actual item / object
-
-    checkpoint: bool = True # Set to False to exclude this item from being saved and loaded from checkpoints
-
-
-class Recorder:
-
-    def __init__(self, output_dir, dummy, logger_prefix):
-        self._global_step = 0
-        self._epoch = 0
-
-        self._logger = Logger(
-            log_dir=str(output_dir), 
-            global_step_getter=lambda: self._global_step,
-            epoch_getter=lambda: self._epoch,
-            dummy=dummy,
-            prefix=logger_prefix
-        )
-    
-    @property
-    def global_step(self):
-        return self._global_step
-
-    @property
-    def epoch(self):
-        return self._epoch
-
-    @property
-    def logger(self):
-        return self._logger
-    
-    def step_global(self):
-        """Increases the 'global_step' counter by 1."""
-        self._global_step += 1
-
-    def step_epoch(self):
-        """Increases the 'epoch' counter by 1."""
-        self._epoch += 1
-
-    def get_state(self):
-        return {
-            "global_step": self._global_step,
-            "epoch": self._epoch
-        }
-
-    def set_state(self, state):
-        self._global_step = state["global_step"]
-        self._epoch = state["epoch"]
-
-    def reset(self):
-        self._global_step = 0
-        self._epoch = 0
 
 class PytorchContext(BasicContext):
 
-    def __init__(self, experiment):
-        BasicContext.__init__(self, experiment)
+    def __init__(self, params):
+        super().__init__(params)
         
         logging.basicConfig(level=self.param("log_level"), handlers=[PytorchLogHandler()])
-
-        logger.info(f"Output dir is '{self.output_dir}'.")
 
         if self.param("distributed") and self.param("local_rank") is None:
             # Launch sub processes like in torch.distributed.launch
@@ -224,43 +215,11 @@ class PytorchContext(BasicContext):
 
             logger.info(f"Distributed runtime initialized. World size is '{torch.distributed.get_world_size()}'.")
 
-        self._checkpoint = {
-            "items": {},
-            "recorders": {}
-        }
+        self._checkpoint = {}
+        self._items = {}
 
         if self.param("checkpoint") is not None:
             self.load_checkpoint(self.param("checkpoint"))
-
-        self._items = {}
-        self._recorders = {
-            "global": Recorder(self.output_dir, (not self.is_master), None)
-        }
-
-        if "global" in self._checkpoint["recorders"]:
-            self._recorders["global"].set_state(self._checkpoint["recorders"]["global"])
- 
-
-    @property
-    def global_step(self):
-        return self._recorders["global"].global_step
-
-    @property
-    def epoch(self):
-        return self._recorders["global"].epoch
-
-    @property
-    def logger(self):
-        return self._recorders["global"].logger
-    
-    def step_global(self):
-        """Increases the 'global_step' counter by 1."""
-        self._recorders["global"].step_global()
-
-    def step_epoch(self):
-        """Increases the 'epoch' counter by 1."""
-        self._recorders["global"].step_epoch()
-    
 
     #
     # Distributed
@@ -306,13 +265,13 @@ class PytorchContext(BasicContext):
     #
 
     def add(self, name, item, cuda=True, checkpoint=True, broadcast_buffers=True):
-        # if name in self._items.keys():
-        #     raise Exception("Names need to be unique. Name '{}' already registered.".format(name))
+        if name in self._items.keys():
+            raise Exception("Names need to be unique. Name '{}' already registered.".format(name))
 
-        if name in self._checkpoint["items"]:
+        if name in self._checkpoint:
             if checkpoint:
                 logger.info(f"Loading parameters from checkpoint for '{name}'.")
-                item.load_state_dict(self._checkpoint["items"][name])
+                item.load_state_dict(self._checkpoint[name])
             else:
                 logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
         
@@ -334,6 +293,12 @@ class PytorchContext(BasicContext):
                     output_device=self.get_allocated_device_ids()[0],
                     broadcast_buffers=broadcast_buffers
                 )
+
+        elif isinstance(item, Recorder):
+            item.set_output_dir(self.output_dir)
+
+            if not self.is_master():
+                item.silence()
         
         self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
 
@@ -346,16 +311,9 @@ class PytorchContext(BasicContext):
 
         return self._items[name].handle
 
-    def recorder(self, name, checkpoint=True):
-        if name not in self._recorders:
-            recorder = Recorder(self.output_dir, (not self.is_master), name)
-
-            if checkpoint and name in self._checkpoint["recorders"]:
-                recorder.set_state(self._checkpoint["recorders"][name])
-
-            self._recorders[name] = RecorderWrapper(handle=recorder, checkpoint=checkpoint)
-
-        return self._recorders[name].handle
+    def delete(self, name):
+        if name in self._items:
+            del self._items[name]
 
     #
     # Tasks
@@ -381,46 +339,37 @@ class PytorchContext(BasicContext):
         torch.manual_seed(self.new_seed())
         np.random.seed(self.new_seed())
 
+
     #
     # Checkpoint
     #
 
-    def save_checkpoint(self, suffix=None):
-        """Saves registered items to a file. All items that have a function named
-        'state_dict' will be saved by calling that function and saving the
+    def save_checkpoint(self, suffix):
+        """Saves registered items to a file. All items that have a function
+        named 'state_dict' will be saved by calling that function and saving the
         returned value.
 
-        Args: suffix (str, optional): If given, will be appended to the
-        checkpoint filename. Default is to use the current value of 'epoch'.
+        Args: suffix (str): Will be appended to the checkpoint filename.
         """
 
         if self.is_master():
-            if suffix is None:
-                suffix = self.epoch
-
             checkpoint_file_path = self.output_dir.joinpath(f"checkpoint-{suffix}.ckpt")
 
             logger.info(f"Saving checkpoint '{checkpoint_file_path}'.")
 
             dict_to_save = {
                 "__torch_version": torch.__version__,
-                "items": {},
-                "recorders": {}
             }
 
             for name, item in self._items.items():
                 if callable(getattr(item.handle, "state_dict", None)):
                     if item.checkpoint:
                         if isinstance(item.handle, torch.nn.parallel.DistributedDataParallel):
-                            dict_to_save["items"][name] = _normalize_state_dict(item.handle.state_dict())
+                            dict_to_save[name] = _normalize_state_dict(item.handle.state_dict())
                         else:
-                            dict_to_save["items"][name] = item.handle.state_dict()
+                            dict_to_save[name] = item.handle.state_dict()
                     else:
                         logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
-
-            for name, recorder in self._recorders.items():
-                if recorder.checkpoint:
-                    dict_to_save["recorders"][name] = recorder.handle.get_state()
 
             with checkpoint_file_path.open("wb") as f:
                 torch.save(dict_to_save, f)

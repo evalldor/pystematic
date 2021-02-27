@@ -1,10 +1,8 @@
 import abc
 import math
-from random import sample
 
 import numpy as np
 import torch
-import tensorboardX
 import tqdm
 
 class DistributedSampler(torch.utils.data.distributed.Sampler):
@@ -38,135 +36,6 @@ class DistributedSampler(torch.utils.data.distributed.Sampler):
 
     def __len__(self):
         return self.num_samples
-
-
-class Logger:
-    """Used for logging metrics during training and evaluation."""
-
-    def __init__(self, log_dir=None, global_step_getter=None, epoch_getter=None, dummy=False, prefix=None):
-        """A dummy logger may be created when running distributed training, in
-        order to restrict logging to the master process."""
-
-        self._scalars = {}
-        self._figures = {}
-        self._images = {}
-        self._dummy = dummy
-        self._prefix = prefix
-        self._global_step_getter = global_step_getter
-        self._epoch_getter = epoch_getter
-
-        self._log_dir = log_dir
-        self._tb_logger = None #SummaryWriter(log_dir)
-        #self._tb_logger.logdir
-
-        self._log_to_tb = True
-        self._log_to_console = False
-
-    def _make_tag(self, tag):
-        if self._prefix is not None:
-            tag = f"{self._prefix}/{tag}"
-        
-        return tag
-
-    def get_tb_logger(self):
-        if self._tb_logger is None:
-            self._tb_logger = tensorboardX.SummaryWriter(self._log_dir)
-        
-        return self._tb_logger
-
-    def log_to_tensorboard(self, log_to_tb):
-        self._log_to_tb = log_to_tb
-
-    def log_to_console(self, log_to_console):
-        self._log_to_console = log_to_console
-
-    def log_dir(self):
-        return self._log_dir
-
-    def scalar(self, tag, scalar):
-        if torch.is_tensor(scalar):
-            scalar = scalar.cpu().item()
-        
-        self._scalars[self._make_tag(tag)] = scalar
-
-    def image_grid(self, tag, images):
-        
-        if torch.is_tensor(images):
-            images = images.cpu().numpy()
-        
-        if len(images.shape) > 5:
-            raise Exception("images.shape must be <= 5 (nrows, ncols, h, w, c)")
-
-        if len(images.shape) == 3:
-            images = np.expand_dims(images, axis=0)
-
-        if len(images.shape) == 4:
-            images = np.expand_dims(images, axis=0)
-
-        nrows = images.shape[0]
-        ncols = images.shape[1]
-        
-        all_rows = []
-
-        for row in range(nrows):
-            curr_row = []
-            for col in range(ncols):
-                curr_row.append(_img_norm(images[row, col]))
-
-            all_rows.append(np.concatenate(curr_row, axis=2))
-       
-
-        img_grid = np.concatenate(all_rows, axis=1)
-        
-        self._images[self._make_tag(tag)] = img_grid
-
-    def figure(self, tag, fig):
-        self._figures[self._make_tag(tag)] = fig
-
-    def clear(self):
-        self._scalars = {}
-        self._figures = {}
-        self._images = {}
-
-    def commit(self):
-        if not self._dummy:
-            global_step = self._global_step_getter()
-            epoch = self._epoch_getter()
-
-            if self._log_to_tb:
-                for name, value in self._scalars.items():
-                    self.get_tb_logger().add_scalar(name, value, global_step)
-
-                for name, value in self._figures.items():
-                    self.get_tb_logger().add_figure(name, value, global_step, close=True)
-
-                for name, value in self._images.items():
-                    self.get_tb_logger().add_image(name, value, global_step)
-                
-                self.get_tb_logger().flush()
-            
-            if self._log_to_console:
-                log_strings = [
-                    "epoch: {}".format(epoch),
-                    "global step: {}".format(global_step)
-                ]
-
-                for name, value in self._scalars.items():
-                    log_strings.append("{}: {:.5f}".format(name, value))
-
-                print("\n".join(log_strings))
-                print("\n")
-
-        self.clear()
-
-
-def _img_norm(img):
-    max_val = np.amax(img)
-    min_val = np.amin(img)
-
-    img = (img - min_val) / (max_val - min_val)
-
-    return img
 
 
 class Looper(abc.ABC):
