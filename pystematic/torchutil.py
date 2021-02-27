@@ -61,9 +61,9 @@ class Looper(abc.ABC):
     def loop_step(self, item, current_step, total_num_steps):
         pass
 
-    def loop_once(self):
+    def loop_once(self, progessbar=True):
         #Only show progressbar for the master process
-        if torch.distributed.is_initialized() and torch.distributed.get_rank() != 0:
+        if not progessbar or (torch.distributed.is_initialized() and torch.distributed.get_rank() != 0):
             self._loop_once_without_progessbar()
         else:
             self._loop_once_with_progessbar()
