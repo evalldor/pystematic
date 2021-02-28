@@ -194,16 +194,6 @@ def global_entrypoint():
     pass
 
 
-def _create_log_dir_name(output_dir, experiment_name):
-    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
-
-@dataclasses.dataclass
-class ExperimentContext:
-    parameters: typing.Dict[str, typing.Any]
-    output_dir: pathlib.Path
-    random_generator: random.Random
-
 def make_experiment_decorator(options, context):
 
     def experiment_constructor(func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
