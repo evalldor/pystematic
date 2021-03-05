@@ -136,20 +136,6 @@ def _launch_distributed_subprocesses(params, params_file, logdir):
         if process.returncode != 0:
             raise subprocess.CalledProcessError(returncode=process.returncode, cmd=sys.argv[:])
 
-def _normalize_state_dict(state_dict):
-    """This removes any key prefixes inserted by DistributedDataParallel so that
-    a model can be loaded without running in distributed mode
-    """
-    new_dict = {}
-    for key, value in state_dict.items():
-        if key.startswith("module."):
-            new_key = re.sub(r"^module\.", "", key)
-            new_dict[new_key] = value
-        else:
-            new_dict[key] = value
-
-    return new_dict
-
 class PytorchLogHandler(logging.Handler):
     """Handle logging for both single- and multiprocess contexts."""
 
@@ -365,7 +351,7 @@ class PytorchContext(BasicContext):
                 if callable(getattr(item.handle, "state_dict", None)):
                     if item.checkpoint:
                         if isinstance(item.handle, torch.nn.parallel.DistributedDataParallel):
-                            dict_to_save[name] = _normalize_state_dict(item.handle.state_dict())
+                            dict_to_save[name] = item.handle.module.state_dict()
                         else:
                             dict_to_save[name] = item.handle.state_dict()
                     else:
