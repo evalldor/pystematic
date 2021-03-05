@@ -224,6 +224,7 @@ class PytorchContext(BasicContext):
     #
     # Distributed
     #
+    
     def is_distributed(self):
         return torch.distributed.is_initialized()
 
@@ -298,7 +299,7 @@ class PytorchContext(BasicContext):
             item.set_output_dir(self.output_dir)
 
             if not self.is_master():
-                item.silence()
+                item.silence() # We silence all recorders which do not belong to the master process
         
         self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
 
