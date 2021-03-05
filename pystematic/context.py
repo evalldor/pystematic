@@ -361,7 +361,7 @@ class PytorchContext(BasicContext):
                 torch.save(dict_to_save, f)
 
     def load_checkpoint(self, checkpoint_file_path):
-        """Loads the checkpoint from the given filepath. Note that this method
+        """Loads a checkpoint from the given filepath. Note that this method
         does not actually populate the items with values, it just loads the
         checkpoint into an internal dict. The actual population of the loaded
         values is done when an item is registered with the context. It is

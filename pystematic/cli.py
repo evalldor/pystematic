@@ -15,6 +15,7 @@ import click
 
 from .context import BasicContext, PytorchContext
 
+from . import pytorch_experiment_api
 
 logger = logging.getLogger("Cli")
 
@@ -194,7 +195,7 @@ def global_entrypoint():
     pass
 
 
-def make_experiment_decorator(options, context):
+def make_experiment_decorator(options, experiment_callback):
 
     def experiment_constructor(func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
 
@@ -210,9 +211,9 @@ def make_experiment_decorator(options, context):
             @functools.wraps(func)
             def command_wrapper(**params):
                 
-                params["_experiment_name"] = experiment_name
+                params["experiment_name"] = experiment_name
 
-                ctx = context(params)
+                ctx = experiment_callback(params)
 
                 return func(ctx)
 
@@ -245,7 +246,8 @@ general_options = [
         help="Show this message and exit.",
         callback=_help_callback
     ),
-    click.Option(["--output-dir"],
+    Parameter(
+        name="output_dir",
         default="./output",
         help=inspect.cleandoc(
             """Parent directory to store all run-logs in. Will be created if it
@@ -255,14 +257,16 @@ general_options = [
         show_default=True,
         show_envvar=True
     ),
-    click.Option(["--log-level"],
-        type=click.Choice(["INFO", "DEBUG"], case_sensitive=False),
-        default="INFO",
-        help="Log level.",
-        show_default=True,
-        show_envvar=True
-    ),
-    click.Option(["--debug/--nodebug"],
+    # click.Option(["--log-level"],
+    #     type=click.Choice(["INFO", "DEBUG"], case_sensitive=False),
+    #     default="INFO",
+    #     help="Log level.",
+    #     show_default=True,
+    #     show_envvar=True
+    # ),
+    Parameter(
+        name="debug",
+        is_flag=True,
         default=False,
         help="Sets debug flag on/off.",
         show_default=True,
@@ -276,23 +280,20 @@ general_options = [
         callback=_params_file_callback,
         allow_from_params_file=False
     ),
-    click.Option(["--random-seed"],
+    Parameter(
+        name="random_seed",
         default=functools.partial(random.getrandbits, 32),
         help="The value to seed random number generators with.",
         type=int, 
         show_default="randomly generated"
     ),
-    click.Option(["--comment"], 
-        type=str,
-        help="A string comment to add to the parameters file for reference.",
-        show_default=True,
-        show_envvar=True
-    ),
     Parameter(
-        name="internal_logdir",
+        name="subprocess",
         default=None,
-        help="Internally used to refer to an already created log dir. DO NOT USE MANUALLY.",
-        type=click.Path(file_okay=False),
+        help="Internally used to indicate that this process is a subprocess. DO NOT USE MANUALLY.",
+        is_eager=True,
+        callback=_params_file_callback,
+        type=click.Path(dir_okay=False),
         allow_from_params_file=False,
         hidden=True
     )
@@ -323,19 +324,16 @@ pytorch_options = [
         show_default=True,
         show_envvar=True
     ),
-    click.Option(["--syncbn/--nosyncbn"], 
-        default=False,
-        help='APEX synchronized batch normalization.',
-        show_default=True,
-        show_envvar=True
-    ),
 
     Label("Distributed"),
-    click.Option(["--distributed/--nodistributed"],
+    Parameter(
+        name="distributed",
         help="Launch in distributed mode",
+        is_flag=True,
         default=False,
         show_default=True,
-        show_envvar=True
+        show_envvar=True,
+        allow_from_params_file=False
     ),
     Parameter(
         name="local_rank", 
@@ -345,7 +343,8 @@ pytorch_options = [
         show_envvar=True,
         allow_from_params_file=False
     ),
-    click.Option(["--nproc-per-node"],
+    Parameter(
+        name="nproc_per_node",
         envvar="NPROC_PER_NODE", 
         type=int, 
         default=1,
@@ -366,7 +365,8 @@ pytorch_options = [
         show_envvar=True,
         allow_from_params_file=False
     ),
-    click.Option(["--nnodes"], 
+    Parameter(
+        name="nnodes", 
         envvar="NNODES",
         type=int, 
         default=1,
@@ -374,7 +374,8 @@ pytorch_options = [
         show_default=True,
         show_envvar=True
     ),
-    click.Option(["--master-addr"], 
+    Parameter(
+        name="master_addr", 
         default="127.0.0.1",
         envvar="MASTER_ADDR",
         type=str,
@@ -384,7 +385,8 @@ pytorch_options = [
         show_default=True,
         show_envvar=True
     ),
-    click.Option(["--master-port"], 
+    Parameter(
+        name="master_port", 
         default=29500, 
         envvar="MASTER_PORT",
         type=int,
@@ -397,4 +399,9 @@ pytorch_options = [
 
 # experiment = make_experiment_decorator(general_options, BasicContext)
 
-pytorch_experiment = make_experiment_decorator(general_options + pytorch_options, PytorchContext)
+def pytorch_experiment_initializer(params):
+    pytorch_experiment_api.api._initialize(params)
+
+    return pytorch_experiment_api.api
+
+pytorch_experiment = make_experiment_decorator(general_options + pytorch_options, pytorch_experiment_initializer)
