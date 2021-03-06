@@ -1,5 +1,7 @@
 __version__ = '0.1.0'
 
+import sys
+
 from .cli import pytorch_experiment, global_entrypoint, parameter_decorator as parameter
 
 from .torchutil import Looper, BetterDataLoader
@@ -8,12 +10,8 @@ from .recording import Recorder
 
 from .counter import Counter
 
-from .pytorch_experiment_api import api as pstorch
+from .pytorch_api import global_api_obj as _torchapi
 
-pstorch.experiment = pytorch_experiment
-pstorch.parameter = parameter
-pstorch.global_entrypoint = global_entrypoint
-pstorch.Looper = Looper
-pstorch.BetterDataLoader = BetterDataLoader
-pstorch.Recorder = Recorder
-pstorch.Counter = Counter
+for name in dir(_torchapi):
+    if not name.startswith("_"):
+        globals()[name] = getattr(_torchapi, name)

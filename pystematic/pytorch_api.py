@@ -13,10 +13,11 @@ import numpy as np
 import torch
 import yaml
 import click
+import wrapt
 
 from .recording import Recorder
 
-logger = logging.getLogger('PytorchAPI')
+logger = logging.getLogger('PystematicTorch')
 
 
 class PytorchLogHandler(logging.Handler):
@@ -43,13 +44,17 @@ class PytorchLogHandler(logging.Handler):
         else:
             click.echo(f"{level} {name} {msg}")
 
+
 class PystematicPytorchAPI:
 
     def __init__(self):
-        self._params = None
-        self._output_dir = None
-        self._random_gen = None
-        self._ctx = None
+        # These are proxies because we want to be able to import them at the
+        # beginning of a file, even if an experiment is not initialized yet
+        self._params = wrapt.ObjectProxy(None)
+        self._output_dir = wrapt.ObjectProxy(None)
+        self._params_file = wrapt.ObjectProxy(None)
+        self._random_gen = wrapt.ObjectProxy(None)
+        self._context = wrapt.ObjectProxy(None)
     
     def _initialize(self, params):
         """This is an internal function used to initialize the api object when a
@@ -63,25 +68,27 @@ class PystematicPytorchAPI:
         logging.basicConfig(level=log_level, handlers=[PytorchLogHandler()])
 
 
-        self._params = params
+        self._params.__wrapped__ = params
 
         if params["subprocess"]:
-            self._output_dir = pathlib.Path(params["subprocess"]).parent
+            self._output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
+            self._params_file.__wrapped__ = pathlib.Path(params["subprocess"])
         else:
-            self._output_dir = _create_log_dir_name(params["output_dir"], params["experiment_name"])
-            self._output_dir.mkdir(parents=True, exist_ok=True)
-            
-            logger.info(f"Writing parameters file to '{self.params_file}'.")
+            self._output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], params["experiment_name"])
+            self._output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
+            self._params_file.__wrapped__ = self._output_dir.joinpath("parameters.yml")
+
+            logger.debug(f"Writing parameters file to '{self.params_file}'.")
             with self.params_file.open("w") as f:
                 yaml.dump(params, f, default_flow_style=False)
 
-        self._random_gen = random.Random(params["random_seed"])
+        self._random_gen.__wrapped__ = random.Random(params["random_seed"])
 
-
-        self._ctx = TorchContext()
+        self._context.__wrapped__ = TorchContext()
+        
 
         if params["checkpoint"]:
-            self._ctx.load_state_dict(self.load_checkpoint(params["checkpoint"]))
+            self._context.load_state_dict(self.load_checkpoint(params["checkpoint"]))
 
         if params["distributed"]:
             self.init_distributed()
@@ -94,7 +101,7 @@ class PystematicPytorchAPI:
 
     @property
     def params_file(self) -> pathlib.Path:
-        return self._output_dir.joinpath("parameters.yml")
+        return self._params_file
 
     @property
     def random_gen(self):
@@ -107,10 +114,10 @@ class PystematicPytorchAPI:
         return self._params
     
     @property
-    def ctx(self):
+    def context(self):
         """Holds the context object for the current experiment. The type of this
         object depends on the type of the current experiment"""
-        return self._ctx
+        return self._context
 
     def new_seed(self, nbits=32) -> int:
         """Use this function to generate random numbers seeded by the experiment
@@ -266,7 +273,7 @@ class PystematicPytorchAPI:
             return torch.load(f, map_location="cpu")
 
 
-api = PystematicPytorchAPI()
+global_api_obj = PystematicPytorchAPI()
 
 
 @dataclasses.dataclass
@@ -290,7 +297,7 @@ class TorchContext:
         if name in self._items:
             return self._items[name].handle
         
-        raise AttributeError()
+        raise AttributeError(f"TorchContext does not have an attribute named '{name}'.")
 
     def __setattr__(self, name, value):
         self.add(name, value)
@@ -309,7 +316,7 @@ class TorchContext:
             else:
                 logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
         
-        if api.params["cuda"] and callable(getattr(item, "cuda", None)):
+        if global_api_obj.params["cuda"] and callable(getattr(item, "cuda", None)):
             if cuda:
                 logger.debug(f"Moving '{name}' to CUDA.")
                 item = item.cuda()
@@ -317,21 +324,19 @@ class TorchContext:
                 logger.debug(f"Not moving item '{name}' to cuda due to item specific config.")
         
         
-        if isinstance(item, torch.nn.Module) and any([p.requires_grad for p in item.parameters()]):
-            if api.params["distributed"]:
+        if isinstance(item, torch.nn.Module):
+            if global_api_obj.params["distributed"] and any([p.requires_grad for p in item.parameters()]):
                 logger.debug(f"Converting to distributed for model '{name}'.")
                 
                 item = torch.nn.parallel.DistributedDataParallel(
                     module=item,
-                    device_ids=api.get_allocated_device_ids(),
-                    output_device=api.get_allocated_device_ids()[0],
-                    broadcast_buffers=True
+                    # device_ids=api.get_allocated_device_ids()
                 )
 
         elif isinstance(item, Recorder):
-            item.set_output_dir(api.output_dir)
+            item.set_output_dir(global_api_obj.output_dir)
 
-            if not api.is_master():
+            if not global_api_obj.is_master():
                 item.silence()
         
         self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)

@@ -15,7 +15,7 @@ import click
 
 from .context import BasicContext, PytorchContext
 
-from . import pytorch_experiment_api
+from .pytorch_api import global_api_obj as torchapi
 
 logger = logging.getLogger("Cli")
 
@@ -197,25 +197,23 @@ def global_entrypoint():
 
 def make_experiment_decorator(options, experiment_callback):
 
-    def experiment_constructor(func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
+    def experiment_constructor(experiment_main_func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
 
         kwargs["context_settings"] = { # These are passed to the click Command class,
             "default_map": defaults, 
             "show_default": True
         }
 
-        def decorator(func):
+        def decorator(experiment_main_func):
             
-            experiment_name = name or func.__name__.lower().replace("_", "-")
+            experiment_name = name or experiment_main_func.__name__.lower().replace("_", "-")
 
-            @functools.wraps(func)
+            @functools.wraps(experiment_main_func)
             def command_wrapper(**params):
                 
                 params["experiment_name"] = experiment_name
 
-                ctx = experiment_callback(params)
-
-                return func(ctx)
+                return experiment_callback(params, experiment_main_func)
 
             cmd = click.decorators._make_command(command_wrapper, experiment_name, attrs=kwargs, cls=Experiment)
             
@@ -229,8 +227,8 @@ def make_experiment_decorator(options, experiment_callback):
 
             return cmd
 
-        if callable(func):
-            return decorator(func)
+        if callable(experiment_main_func):
+            return decorator(experiment_main_func)
         else:
             return decorator
 
@@ -309,16 +307,16 @@ pytorch_options = [
         show_envvar=True,
         allow_from_params_file=False
     ),
-    Parameter(
-        name="continue_from",
-        type=click.Path(file_okay=False),
-        is_eager=True,
-        callback=_continue_from_callback,
-        help="Continue from the latest checkpoint found in dir.",
-        show_default=True,
-        show_envvar=True,
-        allow_from_params_file=False
-    ),
+    # Parameter(
+    #     name="continue_from",
+    #     type=click.Path(file_okay=False),
+    #     is_eager=True,
+    #     callback=_continue_from_callback,
+    #     help="Continue from the latest checkpoint found in dir.",
+    #     show_default=True,
+    #     show_envvar=True,
+    #     allow_from_params_file=False
+    # ),
     click.Option(["--cuda/--nocuda"],
         default=True,
         show_default=True,
@@ -399,9 +397,9 @@ pytorch_options = [
 
 # experiment = make_experiment_decorator(general_options, BasicContext)
 
-def pytorch_experiment_initializer(params):
-    pytorch_experiment_api.api._initialize(params)
+def pytorch_experiment_initializer(params, experiment_main):
+    torchapi._initialize(params)
 
-    return pytorch_experiment_api.api
+    return experiment_main(params, torchapi.context)
 
 pytorch_experiment = make_experiment_decorator(general_options + pytorch_options, pytorch_experiment_initializer)
