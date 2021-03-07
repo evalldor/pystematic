@@ -12,6 +12,7 @@ from .counter import Counter
 
 from .pytorch_api import global_api_obj as _torchapi
 
+# Import all attributes of the api object to the module level
 for name in dir(_torchapi):
     if not name.startswith("_"):
         globals()[name] = getattr(_torchapi, name)

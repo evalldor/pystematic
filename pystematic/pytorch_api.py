@@ -8,6 +8,8 @@ import random
 import subprocess
 import sys
 import typing
+import multiprocessing
+import copy
 
 import numpy as np
 import torch
@@ -16,6 +18,7 @@ import click
 import wrapt
 
 from .recording import Recorder
+from .utils import invoke_command_with_parsed_args
 
 logger = logging.getLogger('PystematicTorch')
 
@@ -74,7 +77,7 @@ class PystematicPytorchAPI:
             self._output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
             self._params_file.__wrapped__ = pathlib.Path(params["subprocess"])
         else:
-            self._output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], params["experiment_name"])
+            self._output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], click.get_current_context().command.name)
             self._output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
             self._params_file.__wrapped__ = self._output_dir.joinpath("parameters.yml")
 
@@ -137,6 +140,21 @@ class PystematicPytorchAPI:
         torch.manual_seed(self.new_seed())
         np.random.seed(self.new_seed())
 
+    def run_experiment(self, experiment, **params):
+        """Runs an experiment in a new process
+        """
+
+        logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
+
+        proc = multiprocessing.Process(
+            target=invoke_command_with_parsed_args, 
+            args=(experiment, params)
+        )
+
+        proc.start()
+
+        return proc
+        
     def launch_subprocess(self, **additional_params):
         """Launches a subprocess. The subprocess will have the same output
         directory and parameters as the current process
@@ -152,17 +170,23 @@ class PystematicPytorchAPI:
         """
         logger.debug("Launching subprocess...")
 
-        cmd = [sys.executable] + sys.argv[:]
-        cmd.append("--subprocess")
-        cmd.append(str(self.params_file))
+        params = {name:value for name, value in self.params.items()}
 
         for name, value in additional_params.items():
-            cmd.append(_param_name_to_cli_name(name))
-            cmd.append(str(value))
-            
-        logger.debug(f"Executing '{' '.join(cmd)}'.")
+            params[name] = value
 
-        process = subprocess.Popen(cmd, env=os.environ.copy())
+        params["subprocess"] = str(self.params_file)
+
+        logger.debug(f"Launching subprocess with arguments '{' '.join(params)}'.")
+            
+        experiment = click.get_current_context().command
+
+        proc = multiprocessing.Process(
+            target=invoke_command_with_parsed_args, 
+            args=(experiment, params)
+        )
+        proc.start()
+        return proc
 
     def is_subprocess(self) -> bool:
         """Returns true if this process is a subprocess. I.e. it has been

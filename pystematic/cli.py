@@ -116,11 +116,11 @@ def _params_file_callback(ctx, param, file_path):
         else:
             with file_path.open("r") as f:
                 params_file = yaml.load(f, Loader=yaml.Loader)
-
+            
             for key in blacklisted_config_ops:
                 params_file.pop(key, None)
-
-            ctx.default_map.update(params_file)
+       
+        return str(file_path)
 
 
 def _help_callback(ctx, param, value):
@@ -211,8 +211,6 @@ def make_experiment_decorator(options, experiment_callback):
             @functools.wraps(experiment_main_func)
             def command_wrapper(**params):
                 
-                params["experiment_name"] = experiment_name
-
                 return experiment_callback(params, experiment_main_func)
 
             cmd = click.decorators._make_command(command_wrapper, experiment_name, attrs=kwargs, cls=Experiment)
@@ -398,6 +396,7 @@ pytorch_options = [
 # experiment = make_experiment_decorator(general_options, BasicContext)
 
 def pytorch_experiment_initializer(params, experiment_main):
+    print(params)
     torchapi._initialize(params)
 
     return experiment_main(params, torchapi.context)
