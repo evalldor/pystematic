@@ -88,6 +88,7 @@ class PystematicPytorchAPI:
         
 
         if params["checkpoint"]:
+            logger.info(f"Loading checkpoint '{params['checkpoint']}'.")
             self._context.load_state_dict(self.load_checkpoint(params["checkpoint"]))
 
         if params["distributed"]:
@@ -193,6 +194,8 @@ class PystematicPytorchAPI:
                 self.launch_subprocess(local_rank=i)
             
             local_rank = 0
+        else:
+            local_rank = self.params["local_rank"]
 
         global_rank = self.params["nproc_per_node"] * self.params["node_rank"] + local_rank
         world_size = self.params["nproc_per_node"] * self.params["nnodes"]
@@ -265,7 +268,7 @@ class PystematicPytorchAPI:
             logger.info(f"Saving checkpoint '{checkpoint_file_path}'.")
 
             with checkpoint_file_path.open("wb") as f:
-                torch.save(self.ctx.state_dict(), f)
+                torch.save(self.context.state_dict(), f)
 
     def load_checkpoint(self, checkpoint_file_path):
         """Loads and returns a checkpoint from the given filepath."""
@@ -306,8 +309,8 @@ class TorchContext:
         if not name.isidentifier():
             raise ValueError(f"'{name}' is not a valid python identifier.")
 
-        if hasattr(self, name):
-            raise ValueError(f"'{name}' is not a valid identifier because it is used by the context object itself.")
+        # if hasattr(self, name):
+        #     raise ValueError(f"'{name}' is not a valid identifier because it is used by the context object itself.")
         
         if name in self._checkpoint:
             if checkpoint:
@@ -330,7 +333,7 @@ class TorchContext:
                 
                 item = torch.nn.parallel.DistributedDataParallel(
                     module=item,
-                    # device_ids=api.get_allocated_device_ids()
+                    device_ids=global_api_obj.get_allocated_device_ids()
                 )
 
         elif isinstance(item, Recorder):

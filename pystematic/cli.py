@@ -115,7 +115,7 @@ def _params_file_callback(ctx, param, file_path):
             logger.warn(f"Could not find parameters file '{file_path}'.")
         else:
             with file_path.open("r") as f:
-                params_file = yaml.safe_load(f)
+                params_file = yaml.load(f, Loader=yaml.Loader)
 
             for key in blacklisted_config_ops:
                 params_file.pop(key, None)
