@@ -18,7 +18,6 @@ import click
 import wrapt
 
 from .recording import Recorder
-from .utils import invoke_command_with_parsed_args
 
 logger = logging.getLogger('PystematicTorch')
 
@@ -148,7 +147,7 @@ class PystematicPytorchAPI:
         logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
 
         proc = multiprocessing.Process(
-            target=invoke_command_with_parsed_args, 
+            target=_invoke_command_with_parsed_args, 
             args=(experiment, params)
         )
 
@@ -183,7 +182,7 @@ class PystematicPytorchAPI:
         experiment = click.get_current_context().command
 
         proc = multiprocessing.Process(
-            target=invoke_command_with_parsed_args, 
+            target=_invoke_command_with_parsed_args, 
             args=(experiment, params)
         )
         proc.start()
@@ -427,10 +426,20 @@ def _move_to_device(obj, device):
     return res
 
 
-def _param_name_to_cli_name(name):
-    return f"--{name.replace('_', '-')}"
-
-
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
+
+def _invoke_command_with_parsed_args(command, args_dict):
+    extra = {}
+    for key, value in command.context_settings.items():
+        if key not in extra:
+            extra[key] = value
+
+    ctx = click.Context(command, **extra)
+
+    for param in command.get_params(ctx):
+        value, _ = param.handle_parse_result(ctx, args_dict, None)
+
+    with ctx as ctx:
+        command.invoke(ctx)
