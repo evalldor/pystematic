@@ -430,6 +430,7 @@ def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
+
 def _invoke_command_with_parsed_args(command, args_dict):
     extra = {}
     for key, value in command.context_settings.items():
