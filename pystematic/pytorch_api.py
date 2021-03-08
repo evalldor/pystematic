@@ -321,6 +321,9 @@ class TorchContext:
     def __setattr__(self, name, value):
         self.add(name, value)
 
+    def has(self, name):
+        return name in self._items
+
     def add(self, name, item, cuda=True, checkpoint=True):
         if not name.isidentifier():
             raise ValueError(f"'{name}' is not a valid python identifier.")
