@@ -74,6 +74,7 @@ class PystematicPytorchAPI:
         self._params.__wrapped__ = params
 
         if params["subprocess"]:
+            logger.debug(f"Initializing subprocess...")
             self._output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
             self._params_file.__wrapped__ = pathlib.Path(params["subprocess"])
         else:
@@ -241,25 +242,16 @@ class PystematicPytorchAPI:
         return torch.distributed.is_initialized()
 
     def is_master(self):
-        return not self.is_distributed() or self.get_rank() == 0
+        return not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
 
     def get_num_processes(self):
-        if self.is_distributed():
+        if torch.distributed.is_initialized():
             return torch.distributed.get_world_size()
             
         return 1
 
-    def get_allocated_device_ids(self):
-        if self.is_distributed():
-            if self.params["local_rank"]:
-                return [self.params["local_rank"]]
-            
-            return [0]
-        
-        return [i for i in range(torch.cuda.device_count())]
-
     def get_rank(self):
-        if self.is_distributed():
+        if torch.distributed.is_initialized():
             return torch.distributed.get_rank()
         
         return 0
@@ -267,13 +259,13 @@ class PystematicPytorchAPI:
     def broadcast_from_master(self, value):
         value = torch.tensor(value)
 
-        if self.is_distributed():
+        if torch.distributed.is_initialized():
             torch.distributed.broadcast(value, 0)
 
         return value
 
     def distributed_barrier(self):
-        if self.is_distributed():
+        if torch.distributed.is_initialized():
             torch.distributed.barrier()
 
     #
@@ -333,8 +325,8 @@ class TorchContext:
         if not name.isidentifier():
             raise ValueError(f"'{name}' is not a valid python identifier.")
 
-        # if hasattr(self, name):
-        #     raise ValueError(f"'{name}' is not a valid identifier because it is used by the context object itself.")
+        if name in dir(self):
+            raise ValueError(f"'{name}' is not allowed as an identifier because it is used by the context object itself.")
         
         if name in self._checkpoint:
             if checkpoint:
@@ -357,7 +349,7 @@ class TorchContext:
                 
                 item = torch.nn.parallel.DistributedDataParallel(
                     module=item,
-                    device_ids=global_api_obj.get_allocated_device_ids()
+                    device_ids=[torch.cuda.current_device()]
                 )
 
         elif isinstance(item, Recorder):
