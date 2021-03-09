@@ -57,7 +57,7 @@ class Looper(abc.ABC):
     def after_loop(self):
         pass
 
-    def loop_step(self, item, current_step, total_num_steps):
+    def loop_step(self, item):
         pass
 
     def loop_once(self, progessbar=True):
