@@ -396,7 +396,7 @@ pytorch_options = [
 # experiment = make_experiment_decorator(general_options, BasicContext)
 
 def pytorch_experiment_initializer(params, experiment_main):
-    print(params)
+    
     torchapi._initialize(params)
 
     return experiment_main(params, torchapi.context)
