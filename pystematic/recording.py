@@ -37,6 +37,10 @@ class Recorder:
     @property
     def count(self):
         return self._counter
+
+    @count.setter
+    def count(self, value):
+        self._counter = value
     
     def step(self):
         """Increases the counter by 1."""

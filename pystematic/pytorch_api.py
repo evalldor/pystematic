@@ -332,6 +332,7 @@ class TorchContext:
         
         if name in self._checkpoint:
             if checkpoint:
+                
                 logger.debug(f"Loading parameters from checkpoint for '{name}'.")
                 item = load_state_dict_into_item(item, self._checkpoint[name])
             else:
