@@ -333,7 +333,7 @@ class TorchContext:
         if name in self._checkpoint:
             if checkpoint:
                 logger.debug(f"Loading parameters from checkpoint for '{name}'.")
-                item.load_state_dict(_move_to_same_device_as(self._checkpoint[name], item))
+                item = load_state_dict_into_item(item, self._checkpoint[name])
             else:
                 logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
         
@@ -367,15 +367,23 @@ class TorchContext:
             "__torch_version": torch.__version__
         }
 
+        supported_types = (int, float, complex, str)
+
         for name, item in self._items.items():
-            if callable(getattr(item.handle, "state_dict", None)):
-                if item.checkpoint:
+            
+            if item.checkpoint:
+                if callable(getattr(item.handle, "state_dict", None)):
                     if isinstance(item.handle, torch.nn.parallel.DistributedDataParallel):
                         dict_with_state[name] = item.handle.module.state_dict()
                     else:
                         dict_with_state[name] = item.handle.state_dict()
-                else:
-                    logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
+                elif isinstance(item.handle, supported_types):
+                    dict_with_state[name] = {
+                        "native_value": item.handle
+                    }
+            else:
+                logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
+                    
 
         return dict_with_state
 
@@ -383,25 +391,57 @@ class TorchContext:
         object.__setattr__(self, "_checkpoint", state)
 
         for name, item in self._items.items():
-            if callable(getattr(item.handle, "load_state_dict", None)):
-                if item.checkpoint:
-                    if isinstance(item.handle, torch.nn.parallel.DistributedDataParallel):
-                        item.handle.module.load_state_dict(_move_to_same_device_as(self._checkpoint[name], item.handle.module))
-                    else:
-                        item.handle.load_state_dict(_move_to_same_device_as(self._checkpoint[name], item.handle))
-                else:
-                    logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
+            if item.checkpoint:
+                item.handle = load_state_dict_into_item(item.handle, self._checkpoint[name])
+            else:
+                logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
+
+
 
 #
 # Helpers
 #
+supported_types = (int, float, complex, str)
+
+def load_state_dict_into_item(item, state_dict):
+
+    if callable(getattr(item, "load_state_dict", None)):
+        if isinstance(item, torch.nn.parallel.DistributedDataParallel):
+            item.module.load_state_dict(_move_to_same_device_as(state_dict, item.module))
+        else:
+            item.load_state_dict(_move_to_same_device_as(state_dict, item))
+
+    elif isinstance(item, supported_types):
+        return state_dict["native_value"]
+    else:
+        logger.debug(f"Cannot checkpoint object of type '{type(item)}'")
+
+    return item
+
+def get_item_state_dict(item):
+    if callable(getattr(item, "state_dict", None)):
+        if isinstance(item, torch.nn.parallel.DistributedDataParallel):
+            return item.module.state_dict()
+        else:
+            return item.state_dict()
+    elif isinstance(item, supported_types):
+        return {
+            "native_value": item
+        }
+    else:
+        logger.debug(f"Cannot checkpoint object of type '{type(item)}'")
+    
+    return None
 
 def _move_to_same_device_as(to_move, target):
     if hasattr(target, "device"):
         return _move_to_device(to_move, target.device)
     
     elif callable(getattr(target, "parameters", None)):
-        return _move_to_device(to_move, next(target.parameters()).device)
+        try:
+            return _move_to_device(to_move, next(target.parameters()).device)
+        except StopIteration:
+            pass
 
     return to_move
 

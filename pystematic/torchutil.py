@@ -74,8 +74,8 @@ class Looper(abc.ABC):
 
         with tqdm.tqdm(dataloader, leave=True) as progress_bar:
             
-            for curr_step, item in enumerate(progress_bar, 1):
-                message = self.loop_step(item, curr_step, len(progress_bar))
+            for item in progress_bar:
+                message = self.loop_step(item)
                 
                 if message is not None:
                     if isinstance(message, str):
@@ -92,8 +92,8 @@ class Looper(abc.ABC):
 
         self.before_loop()
 
-        for curr_step, item in enumerate(dataloader, 1):
-            self.loop_step(item, curr_step, len(dataloader))
+        for item in dataloader:
+            self.loop_step(item)
 
         self.after_loop()
 
