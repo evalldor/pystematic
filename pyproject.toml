@@ -18,6 +18,8 @@ wrapt = "^1.12.1"
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 pylint = "^2.6.0"
+Sphinx = "^3.5.2"
+sphinx-rtd-theme = "^0.5.1"
 
 [build-system]
 requires = ["poetry>=0.12"]

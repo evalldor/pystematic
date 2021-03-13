@@ -31,8 +31,9 @@ Defining an experiment is super easy:
     def my_experiment(parameters, context):
         print("Hello from my_experiment")
 
-We will discuss the arguments to the function shortly. To run you experiment,
-you add the following at the bottom of your source file:
+We will discuss the arguments to the function shortly. To be able to run the
+experiment from the commandline, you add the following at the bottom of your
+source file:
 
 .. code-block::
     if __name__ == "__main__":
