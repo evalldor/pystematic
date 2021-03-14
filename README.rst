@@ -1,51 +1,6 @@
 *A collection of tools that helps you to systematically setup and run
 reproducible experiments in pytorch.*
 
-This framework has grown out of my own needs as an ML research engineer. The aim
-is to assist in the experimentation of and development of all kinds of ML
-experiments. More specifically it: 
-
-* Makes your experiments easy to run by providing a CLI. 
-  
-* Helps with managing parameters of you experiments (such as learning rates
-  etc.), and makes them assignable from the CLI
-
-* Helps you transition seamlessly between distributed and non-distributed sessions.
-
-* Helps with recording stats and keeping track of which parameters gave which result.
-
-
-Experiment
------------
-The central concept in pystematic is that of an *Experiment*. An experiment consists of:
-
-* A *main function* that executes the code associated with the experiment,
-* and a set of *parameters*, that controls some aspects of the experiments behavior.
-
-Defining an experiment is super easy:
-
-.. code-block::
-    import pystematic
-
-    @pystematic.experiment
-    def my_experiment(parameters, context):
-        print("Hello from my_experiment")
-
-We will discuss the arguments to the function shortly. To be able to run the
-experiment from the commandline, you add the following at the bottom of your
-source file:
-
-.. code-block::
-    if __name__ == "__main__":
-        pystematic.global_entrypoint()
-
-When you run the file:
-
-.. code-block:: bash
-    $ python path/to/file.py
-
-you will find that the call to `pystematic.global_entrypoint()` works as a CLI interface to all experiments
-that you have defined.
 
 
 CLI

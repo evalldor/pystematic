@@ -46,7 +46,6 @@ class PytorchLogHandler(logging.Handler):
         else:
             click.echo(f"{level} {name} {msg}")
 
-
 class PystematicPytorchAPI:
 
     def __init__(self):
@@ -57,7 +56,8 @@ class PystematicPytorchAPI:
         self._params_file = wrapt.ObjectProxy(None)
         self._random_gen = wrapt.ObjectProxy(None)
         self._context = wrapt.ObjectProxy(None)
-    
+        
+          
     def _initialize(self, params):
         """This is an internal function used to initialize the api object when a
         new experiment is started"""
@@ -100,7 +100,8 @@ class PystematicPytorchAPI:
     @property
     def output_dir(self) -> pathlib.Path:
         """Returns a pathlib.Path object that points to the current output
-        directory"""
+        directory. All output from an experiment should be written to this
+        folder."""
         return self._output_dir
 
     @property
@@ -163,9 +164,9 @@ class PystematicPytorchAPI:
 
             The subprocess will be initialized with the same random
             seed as the current process. If this is not what you want, you
-            should pass a new seed to this function in the :param:`random_seed` parameter. 
+            should pass a new seed to this function in the ``random_seed`` parameter. 
 
-            E.g:``ps.launch_subprocess(random_seed=ps.new_seed())``
+            E.g: :code:`ps.launch_subprocess(random_seed=ps.new_seed())`
 
         """
         logger.debug("Launching subprocess...")
@@ -273,7 +274,7 @@ class PystematicPytorchAPI:
 
     def save_checkpoint(self, filename):
         """Saves registered items to a file. All items that have a function
-        named 'state_dict' will be saved by calling that function and saving the
+        named ``state_dict`` will be saved by calling that function and saving the
         returned value.
         """
 
