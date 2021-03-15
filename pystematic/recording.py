@@ -1,6 +1,7 @@
 import torch
 import tensorboardX
 
+import pathlib
 
 
 class Recorder:
@@ -138,3 +139,38 @@ class ConsoleBackend(RecorderBackend):
         self._scalars["counter"] = counter
         self._scalars[tag] = scalar
 
+
+class FileBackend(RecorderBackend):
+
+    def __init__(self, output_dir):
+        self.set_output_dir(output_dir)
+
+    def set_output_dir(self, output_dir):
+        self._scalars_file = pathlib.Path(output_dir).joinpath("scalars.csv")
+        self._img_folder = pathlib.Path(output_dir).joinpath("images")
+        self._figures_folder = pathlib.Path(output_dir).joinpath("figures")
+
+    def step(self):
+        pass
+
+    def scalar(self, tag, scalar, counter):
+
+        if not self._scalars_file.exists():
+            with self._scalars_file.open("w") as f:
+                f.write("step, tag, value\n")
+
+        with self._scalars_file.open("a") as f:
+            f.write(f"{counter}, {tag}, {scalar}\n")
+
+
+    def figure(self, tag, fig, counter):
+        self._figures_folder.mkdir(exist_ok=True, parents=True)
+        fig_path = self._figures_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
+
+        
+
+    def image(self, tag, image, counter):
+        self._img_folder.mkdir(exist_ok=True, parents=True)
+        img_path = self._img_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
+
+        
