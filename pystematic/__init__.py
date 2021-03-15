@@ -5,6 +5,8 @@ from .internal import global_entrypoint
 
 from .cli import pytorch_experiment, parameter_decorator as parameter
 
+experiment = pytorch_experiment # temp alias
+
 from .torchutil import Looper, BetterDataLoader
 
 from .recording import Recorder

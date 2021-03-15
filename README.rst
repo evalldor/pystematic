@@ -1,18 +1,6 @@
 *A collection of tools that helps you to systematically setup and run
 reproducible experiments in pytorch.*
 
-This framework has grown out of my own needs as an ML research engineer. The aim
-is to assist in the experimentation of and development of all kinds of ML
-experiments. More specifically it: 
-
-* Makes your experiments easy to run by providing a CLI. 
-  
-* Helps with managing parameters of you experiments (such as learning rates
-  etc.), and makes them assignable from the CLI
-
-* Helps you transition seamlessly between parallel and non-parallel sessions.
-
-* Helps with recording stats and keeping track of which parameters gave which result.
 
 
 CLI
