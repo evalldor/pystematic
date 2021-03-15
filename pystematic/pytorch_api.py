@@ -1,26 +1,24 @@
-import collections
 import dataclasses
 import datetime
 import logging
-import os
+import multiprocessing
 import pathlib
 import random
-import subprocess
-import sys
+import string
+import time
+import traceback
 import typing
-import multiprocessing
-import copy
 
+import click
 import numpy as np
 import torch
-import yaml
-import click
 import wrapt
+import yaml
 
 from .recording import Recorder
+from .internal import invoke_command_with_parsed_args
 
 logger = logging.getLogger('PystematicTorch')
-
 
 class PytorchLogHandler(logging.Handler):
     """Handle logging for both single- and multiprocess contexts."""
@@ -45,6 +43,9 @@ class PytorchLogHandler(logging.Handler):
             click.echo(f"{level} {rank} {name} {msg}")
         else:
             click.echo(f"{level} {name} {msg}")
+
+        if record.exc_info:
+            click.echo(f"{level} {traceback.format_exc()}")
 
 
 class PystematicPytorchAPI:
@@ -96,6 +97,9 @@ class PystematicPytorchAPI:
 
         if params["distributed"]:
             self.init_distributed()
+        elif params["default_cuda_device"] is not None:
+            torch.cuda.set_device(params["default_cuda_device"])
+
 
     @property
     def output_dir(self) -> pathlib.Path:
@@ -154,6 +158,27 @@ class PystematicPytorchAPI:
         proc.start()
 
         return proc
+
+    def run_experiments_in_pool(self, pool_size, experiment, list_of_params):
+        """Runs an experiment with a set of different params. At most pool_size
+        processes will exist simultaneously
+        """
+
+        # logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
+
+
+        pool = ProcessQueue(pool_size, range(torch.cuda.device_count()))
+        pool.run_and_wait_for_completion(experiment, list_of_params)
+        # def runner(experiment, params):
+        #     try:
+        #         return _invoke_command_with_parsed_args(experiment, params)
+        #     except Exception as e:
+        #         logger.exception(e)
+        
+        # # joblib.Parallel(n_jobs=pool_size)(joblib.delayed(runner)(params) for params in list_of_params)
+        # with multiprocessing.Pool(pool_size) as pool:
+        #     pool.starmap(runner, itertools.product((experiment.name,), list_of_params))
+
         
     def launch_subprocess(self, **additional_params):
         """Launches a subprocess. The subprocess will have the same output
@@ -469,7 +494,13 @@ def _move_to_device(obj, device):
 
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
+    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
+
+    if directory.exists():
+        suffix = "".join(random.SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(6))
+        directory = directory.with_name(f"{directory.name}-{suffix}")
+
+    return directory
 
 
 def _invoke_command_with_parsed_args(command, args_dict):
@@ -485,3 +516,64 @@ def _invoke_command_with_parsed_args(command, args_dict):
 
     with ctx as ctx:
         command.invoke(ctx)
+
+class ProcessQueue:
+
+
+    def __init__(self, num_processes, gpu_ids=[]):
+        self._mp_context = multiprocessing.get_context('spawn')
+        self._num_processes = num_processes
+        self._live_processes = []
+        
+        self._gpus = {}
+
+        for gpu_id in gpu_ids:
+            self._gpus[gpu_id] = 0
+
+    def allocate_gpu(self):
+        min_count = 99999999999
+        min_id = -1
+        for gpu_id, count in self._gpus.items():
+            if count < min_count:
+                min_id = gpu_id
+                min_count = count
+        
+        if min_id != -1:
+            self._gpus[min_id] += 1
+            return min_id
+        
+        return 0
+
+
+    def release_gpu(self, gpu_id):
+        if gpu_id in self._gpus:
+            self._gpus[gpu_id] -= 1
+
+    def run_and_wait_for_completion(self, experiment, list_of_params):
+        
+        for params in list_of_params:
+            
+            while len(self._live_processes) >= self._num_processes:
+                time.sleep(0.1)
+                completed_procs = [proc for proc in self._live_processes if proc.exitcode is not None]
+
+                for proc in completed_procs:
+                    self.release_gpu(proc.gpu)
+                    self._live_processes.remove(proc)
+            
+            gpu = self.allocate_gpu()
+            proc = self._mp_context.Process(
+                target=invoke_command_with_parsed_args, 
+                args=(experiment, {**params, "default_cuda_device": gpu})
+            )
+            proc.gpu = gpu
+            proc.start()
+            self._live_processes.append(proc)
+        
+        while len(self._live_processes) > 0:
+            time.sleep(0.1)
+            completed_procs = [proc for proc in self._live_processes if proc.exitcode is not None]
+
+            for proc in completed_procs:
+                self.release_gpu(proc.gpu)
+                self._live_processes.remove(proc)

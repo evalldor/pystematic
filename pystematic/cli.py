@@ -16,6 +16,7 @@ import click
 from .context import BasicContext, PytorchContext
 
 from .pytorch_api import global_api_obj as torchapi
+from .internal import global_entrypoint
 
 logger = logging.getLogger("Cli")
 
@@ -182,18 +183,6 @@ def _get_attached_click_parameters(f):
     return []
 
 
-@click.group()
-def global_entrypoint():
-    """pystematic global entrypoint. Below is a list of all registered
-    experiments. Append the name of the experiment you would like to run to the
-    commandline you invoked to run this script.
-    """
-    """All experiments are registered with this Click group. In your main
-    script, simply call this function to access the CLI for all registered
-    experiments.
-    """
-    pass
-
 
 def make_experiment_decorator(options, experiment_callback):
 
@@ -222,8 +211,8 @@ def make_experiment_decorator(options, experiment_callback):
 
             # Register the command with the global entrypoint.
             global_entrypoint.add_command(cmd)
-
-            return cmd
+            experiment_main_func.command = cmd
+            return experiment_main_func
 
         if callable(experiment_main_func):
             return decorator(experiment_main_func)
@@ -320,7 +309,17 @@ pytorch_options = [
         show_default=True,
         show_envvar=True
     ),
-
+    Parameter(
+        name="default_cuda_device",
+        type=int,
+        default=None,
+        help="If set, this will be the default cuda device configured "
+            "for pytorch. Ignored when running in distributed mode.",
+        show_default=True,
+        show_envvar=True,
+        allow_from_params_file=False
+    ),
+    
     Label("Distributed"),
     Parameter(
         name="distributed",
