@@ -115,7 +115,7 @@ def global_entrypoint():
 
 
 def get_current_experiment():
-    pass
+    return click.get_current_context().command._experiment_main_func
 
 
 def get_experiment_parameters(experiment):
