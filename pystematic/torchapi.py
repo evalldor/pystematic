@@ -16,7 +16,7 @@ import wrapt
 import yaml
 
 from .recording import Recorder
-from .click_adapter import invoke_experiment_with_parsed_args
+from .click_adapter import invoke_experiment_with_parsed_args, get_current_experiment
 
 logger = logging.getLogger('pystematic_torch')
 
@@ -27,14 +27,10 @@ logger = logging.getLogger('pystematic_torch')
 #
 
 params: dict = wrapt.ObjectProxy(None)
-"""Holds the parameters of the current experiment"""
 
 
 output_dir: pathlib.Path = wrapt.ObjectProxy(None)
-"""Returns a pathlib.Path object that points to the current output
-directory. All output from an experiment should be written to this
-folder.
-"""
+
 
 params_file: pathlib.Path  = wrapt.ObjectProxy(None)
 """Points to the current parameters file."""
@@ -45,7 +41,6 @@ random_gen: random.Random = wrapt.ObjectProxy(None)
 
 
 context = wrapt.ObjectProxy(None)
-"""Holds the context object for the current experiment."""
 
 
 def new_seed(nbits=32) -> int:
@@ -222,7 +217,7 @@ def broadcast_from_master(value):
     return value
 
 
-def distributed_barrier():
+def distributed_barrier() -> None:
     if torch.distributed.is_initialized():
         torch.distributed.barrier()
 
@@ -385,7 +380,7 @@ def _initialize(_params):
         output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
         params_file.__wrapped__ = pathlib.Path(params["subprocess"])
     else:
-        output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], click.get_current_context().command.name)
+        output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], get_current_experiment().experiment_name)
         output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
         params_file.__wrapped__ = output_dir.joinpath("parameters.yml")
 

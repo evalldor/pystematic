@@ -139,4 +139,3 @@ class BetterDataLoader(torch.utils.data.DataLoader):
     """
     def __init__(self, dataset, shuffle=False, random_seed=0, **kwargs):
         super().__init__(dataset, sampler=create_sampler(dataset, shuffle, random_seed), **kwargs)
-        

@@ -10,20 +10,38 @@ Decorators and entrypoint
 
 .. autofunction:: pystematic.global_entrypoint
 
+
 Experiment API
 --------------
 
-General
-+++++++
+
+Global attributes
++++++++++++++++++
+
+These attributes holds information related to the current experiment. Note that
+they are uninitialized until an experiment has actually started.
 
 .. autodata:: pystematic.output_dir
-    :no-value:
+    :annotation: : pathlib.Path
 
-.. autodata:: pystematic.params
-    :no-value:
+    Holds a :code:`pathlib.Path` object that points to the current output
+    directory. All output from an experiment should be written to this
+    folder.
+
+
+.. autodata:: pystematic.params 
+    :annotation: : dict
+
+    Holds the parameters of the current experiment
+
 
 .. autodata:: pystematic.context
     :no-value:
+
+    Holds the context object for the current experiment.
+
+General
++++++++
 
 .. autofunction:: pystematic.new_seed
 
@@ -32,7 +50,6 @@ General
 .. autofunction:: pystematic.launch_subprocess
 
 .. autofunction:: pystematic.is_subprocess
-
 
 Distributed
 +++++++++++
@@ -48,7 +65,6 @@ Distributed
 .. autofunction:: pystematic.get_rank
 
 .. autofunction:: pystematic.distributed_barrier
-
 
 
 Checkpoints
