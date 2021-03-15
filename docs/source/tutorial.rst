@@ -9,6 +9,10 @@ consists of:
 #. and a set of **parameters**, that controls some aspects of the experiments
    behavior.
 
+
+Defining experiments
+--------------------
+
 Defining an experiment is super easy. You simple decorate the main function of
 your experiment with the :code:`experiment` decorator:
 
@@ -48,6 +52,10 @@ To run a specific experiment, simply append its name to the commandline:
    $ python path/to/file.py my-experiment
    Hello from my_experiment
 
+
+Adding parameters
+-----------------
+
 Each experiment has a set of parameters associated with it. If you run:
 
 .. code-block:: bash
@@ -73,17 +81,39 @@ default parameters. To add additional parameters to the experiment, you use the
       print(f"string_to_print is {params['string_to_print']}")
 
 
-.. note::
+A note on naming conventions
+----------------------------
 
-   At this point it is probably a good idea to mention something about the
-   naming conventions used. 
+At this point it is probably a good idea to mention something about the
+naming conventions used. 
 
-   You may have noticed that in the python source code, the name of all
-   experiments and parameters use the snake_case convention, but on the
-   commandline, these are magically converted to kebab-case. This seems to be a
-   convention in CLI tools, and this framework sticks to that convention.
-   
-   To reiterate, this means that on the commanline, all paramters and
-   experiments use the kebab-case naming convention, but in the source code,
-   they all use the snake_case naming convention.
+You may have noticed that in the python source code, the name of all
+experiments and parameters use the snake_case convention, but on the
+commandline, these are magically converted to kebab-case. This seems to be a
+convention in CLI tools, and this framework sticks to that convention.
 
+To reiterate, this means that on the commanline, all paramters and
+experiments use the kebab-case naming convention, but in the source code,
+they all use the snake_case naming convention.
+
+
+Experiment output
+-----------------
+
+If you tried out the examples above you might have noticed that a folder named
+``output`` was created in you current working directory. This is no accident.
+Every time an experiment is run, a unique output folder is created in the
+configured output directory. The folder creation follows the naming convention
+``<output_dir>/<experiment_name>/<current date and time>``, where ``output_dir``
+is the value of the parameter with the same name (which defaults to your current
+working directory).
+
+The reason each invocation of an experiment gets its own output directory is to
+avoid mixing up outputs from different runs.
+
+If you look into the output directory of one of the experiment runs you will
+also notice that there is a file there named ``parameters.yaml``. This file
+contains the value of all parameters when the experiment was run. This means
+that, as long as you write all experiment output to the directory pointed to by
+the property :code:`pystematic.output_dir`, you can keep track of which
+paramaters gave which output. Neat!

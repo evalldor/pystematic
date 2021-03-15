@@ -1,3 +1,5 @@
+import inspect
+
 import click
 
 
@@ -65,6 +67,59 @@ class ExperimentClickCommand(click.Command):
                         formatter.write_dl(opts[label], col_max=40)
 
 
+class ExperimentCollection(click.Group):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def format_usage(self, ctx, formatter):
+        """Writes the usage line into the formatter.
+
+        This is a low-level method called by :meth:`get_usage`.
+        """
+        pieces = self.collect_usage_pieces(ctx)
+        # formatter.write_usage(ctx.command_path, " ".join(pieces))
+        formatter.write_usage(ctx.command_path, "[OPTIONS] EXPERIMENT_NAME [PARAMETERS]")
+    
+    def format_help_text(self, ctx, formatter):
+        """Writes the help text to the formatter if it exists."""
+        
+        formatter.write_paragraph()
+        with formatter.indentation():
+            help_text = inspect.cleandoc("""Pystematic global entrypoint. Below is a list of all registered
+                                            experiments. Append the name of the experiment you would like to
+                                            run to the commandline you invoked to run this script.""")
+            formatter.write_text(help_text)
+
+    def format_commands(self, ctx, formatter):
+        commands = []
+        for subcommand in self.list_commands(ctx):
+            cmd = self.get_command(ctx, subcommand)
+            # What is this, the tool lied about a command.  Ignore it
+            if cmd is None:
+                continue
+            if cmd.hidden:
+                continue
+
+            commands.append((subcommand, cmd))
+
+        # allow for 3 times the default spacing
+        with formatter.section("Experiments"):
+            if len(commands) > 0:
+                limit = formatter.width - 6 - max(len(cmd[0]) for cmd in commands)
+
+                rows = []
+                for subcommand, cmd in commands:
+                    help = cmd.get_short_help_str(limit)
+                    rows.append((subcommand, help))
+
+                formatter.write_dl(rows)
+
+            else:
+                formatter.write_text("No experiments defined yet...")
+
+
+
 def parameter_decorator(
     name, 
     help=None, 
@@ -101,7 +156,8 @@ def parameter_decorator(
     return decorator
 
 
-@click.group()
+
+@click.group(cls=ExperimentCollection)
 def global_entrypoint():
     """This function acts as an entrypoint to all defined experiments. In your
     main script, simply call this function to access the CLI for all registered
