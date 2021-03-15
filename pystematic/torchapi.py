@@ -5,6 +5,9 @@ import multiprocessing
 import pathlib
 import random
 import typing
+import string
+import time
+import atexit
 
 import click
 import numpy as np
@@ -13,51 +16,10 @@ import wrapt
 import yaml
 
 from .recording import Recorder
+from .click_adapter import invoke_experiment_with_parsed_args
 
 logger = logging.getLogger('pystematic_torch')
 
-#
-# Internal
-#
-
-def _initialize(self, params):
-    """This is an internal function used to initialize the api object when a
-    new experiment is started"""
-
-    if params["debug"]:
-        log_level = "DEBUG"
-    else:
-        log_level = "INFO"
-
-    logging.basicConfig(level=log_level, handlers=[PytorchLogHandler()])
-
-
-    self._params.__wrapped__ = params
-
-    if params["subprocess"]:
-        logger.debug(f"Initializing subprocess...")
-        self._output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
-        self._params_file.__wrapped__ = pathlib.Path(params["subprocess"])
-    else:
-        self._output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], click.get_current_context().command.name)
-        self._output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
-        self._params_file.__wrapped__ = self._output_dir.joinpath("parameters.yml")
-
-        logger.debug(f"Writing parameters file to '{self.params_file}'.")
-        with self.params_file.open("w") as f:
-            yaml.dump(params, f, default_flow_style=False)
-
-    self._random_gen.__wrapped__ = random.Random(params["random_seed"])
-
-    self._context.__wrapped__ = TorchContext()
-    
-
-    if params["checkpoint"]:
-        logger.info(f"Loading checkpoint '{params['checkpoint']}'.")
-        self._context.load_state_dict(self.load_checkpoint(params["checkpoint"]))
-
-    if params["distributed"]:
-        self.init_distributed()
 
 
 #
@@ -75,7 +37,7 @@ folder.
 """
 
 params_file: pathlib.Path  = wrapt.ObjectProxy(None)
-"""The current parameters file."""
+"""Points to the current parameters file."""
 
 
 random_gen: random.Random = wrapt.ObjectProxy(None)
@@ -94,7 +56,7 @@ def new_seed(nbits=32) -> int:
     return random_gen.getrandbits(nbits)
 
 
-def seed_known_random_generators():
+def seed_known_random_generators() -> None:
     """This is just a helper to seed all known random modules with
     reproducible seeds."""
     
@@ -105,14 +67,14 @@ def seed_known_random_generators():
     np.random.seed(new_seed())
 
 
-def run_experiment(experiment, **params):
+def run_experiment(experiment, **params) -> multiprocessing.Process:
     """Runs an experiment in a new process
     """
 
-    logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
+    logger.debug(f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
 
-    proc = multiprocessing.Process(
-        target=_invoke_command_with_parsed_args, 
+    proc = multiprocessing.get_context('spawn').Process(
+        target=invoke_experiment_with_parsed_args, 
         args=(experiment, params)
     )
 
@@ -121,7 +83,28 @@ def run_experiment(experiment, **params):
     return proc
 
 
-def launch_subprocess(**additional_params):
+def run_experiments_in_pool(pool_size, experiment, list_of_params) -> None:
+    """Runs an experiment with a set of different params. At most pool_size
+    processes will exist simultaneously
+    """
+
+    # logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
+
+
+    pool = ProcessQueue(pool_size, range(torch.cuda.device_count()))
+    pool.run_and_wait_for_completion(experiment, list_of_params)
+    # def runner(experiment, params):
+    #     try:
+    #         return _invoke_command_with_parsed_args(experiment, params)
+    #     except Exception as e:
+    #         logger.exception(e)
+    
+    # # joblib.Parallel(n_jobs=pool_size)(joblib.delayed(runner)(params) for params in list_of_params)
+    # with multiprocessing.Pool(pool_size) as pool:
+    #     pool.starmap(runner, itertools.product((experiment.name,), list_of_params))
+
+
+def launch_subprocess(**additional_params) -> multiprocessing.Process:
     """Launches a subprocess. The subprocess will have the same output
     directory and parameters as the current process
 
@@ -136,22 +119,21 @@ def launch_subprocess(**additional_params):
     """
     logger.debug("Launching subprocess...")
 
-    params = {name:value for name, value in params.items()}
+    subprocess_params = {name:value for name, value in params.items()}
 
     for name, value in additional_params.items():
-        params[name] = value
+        subprocess_params[name] = value
 
-    params["subprocess"] = str(params_file)
+    subprocess_params["subprocess"] = str(params_file)
 
-    logger.debug(f"Launching subprocess with arguments '{' '.join(params)}'.")
+    logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
         
-    experiment = click.get_current_context().command
+    experiment = click.get_current_context().command._experiment_main_func
 
     proc = multiprocessing.Process(
-        target=_invoke_command_with_parsed_args, 
-        args=(experiment, params)
+        target=invoke_experiment_with_parsed_args, 
+        args=(experiment, subprocess_params)
     )
-
     proc.start()
 
     return proc
@@ -183,7 +165,7 @@ def place_on_correct_device(*args):
 # Pytorch distributed
 #
 
-def init_distributed():
+def init_distributed() -> None:
     if params["local_rank"] is None:
         for i in range(1, params["nproc_per_node"]):
             launch_subprocess(local_rank=i)
@@ -209,22 +191,22 @@ def init_distributed():
     logger.debug(f"Distributed runtime initialized.")
 
 
-def is_distributed():
+def is_distributed() -> bool:
     return torch.distributed.is_initialized()
 
 
-def is_master():
+def is_master() -> bool:
     return not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
 
 
-def get_num_processes():
+def get_num_processes() -> int:
     if torch.distributed.is_initialized():
         return torch.distributed.get_world_size()
         
     return 1
 
 
-def get_rank():
+def get_rank() -> int:
     if torch.distributed.is_initialized():
         return torch.distributed.get_rank()
     
@@ -249,7 +231,7 @@ def distributed_barrier():
 # Checkpoints
 #
 
-def save_checkpoint(filename):
+def save_checkpoint(filename) -> None:
     """Saves registered items to a file. All items that have a function
     named ``state_dict`` will be saved by calling that function and saving the
     returned value.
@@ -264,10 +246,12 @@ def save_checkpoint(filename):
             torch.save(context.state_dict(), f)
 
 
-def load_checkpoint(checkpoint_file_path):
+def load_checkpoint(checkpoint_file_path) -> dict:
     """Loads and returns a checkpoint from the given filepath."""
     with open(checkpoint_file_path, "rb") as f:
         return torch.load(f, map_location="cpu")
+
+
 
 
 #
@@ -379,6 +363,68 @@ class TorchContext:
 
 
 #
+# Internal
+#
+
+def _initialize(_params):
+    """This is an internal function used to initialize the api object when a
+    new experiment is started"""
+
+    if _params["debug"]:
+        log_level = "DEBUG"
+    else:
+        log_level = "INFO"
+
+    logging.basicConfig(level=log_level, handlers=[PytorchLogHandler()])
+
+
+    params.__wrapped__ = _params
+
+    if params["subprocess"]:
+        logger.debug(f"Initializing subprocess...")
+        output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
+        params_file.__wrapped__ = pathlib.Path(params["subprocess"])
+    else:
+        output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], click.get_current_context().command.name)
+        output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
+        params_file.__wrapped__ = output_dir.joinpath("parameters.yml")
+
+        logger.debug(f"Writing parameters file to '{params_file}'.")
+        with params_file.open("w") as f:
+            yaml.dump(_params, f, default_flow_style=False)
+
+    random_gen.__wrapped__ = random.Random(params["random_seed"])
+
+    context.__wrapped__ = TorchContext()
+    
+
+    if params["checkpoint"]:
+        logger.info(f"Loading checkpoint '{params['checkpoint']}'.")
+        context.load_state_dict(load_checkpoint(params["checkpoint"]))
+
+    if params["distributed"]:
+        init_distributed()
+    elif params["default_cuda_device"] is not None:
+        torch.cuda.set_device(params["default_cuda_device"])
+
+
+def _cleanup():
+    procs = multiprocessing.active_children()
+    for proc in procs:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+
+    for proc in procs:
+        try:
+            proc.join()
+        except Exception:
+            pass
+
+atexit.register(_cleanup)
+
+#
 # private Helpers
 #
 
@@ -452,22 +498,13 @@ def _move_to_device(obj, device):
 
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    return pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
+    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
+    if directory.exists():
+        suffix = "".join(random.SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(6))
+        directory = directory.with_name(f"{directory.name}-{suffix}")
 
-def _invoke_command_with_parsed_args(command, args_dict):
-    extra = {}
-    for key, value in command.context_settings.items():
-        if key not in extra:
-            extra[key] = value
-
-    ctx = click.Context(command, **extra)
-
-    for param in command.get_params(ctx):
-        value, _ = param.handle_parse_result(ctx, args_dict, None)
-
-    with ctx as ctx:
-        command.invoke(ctx)
+    return directory
 
 
 class PytorchLogHandler(logging.Handler):
@@ -493,3 +530,64 @@ class PytorchLogHandler(logging.Handler):
             click.echo(f"{level} {rank} {name} {msg}")
         else:
             click.echo(f"{level} {name} {msg}")
+
+
+class ProcessQueue:
+
+    def __init__(self, num_processes, gpu_ids=[]):
+        self._mp_context = multiprocessing.get_context('spawn')
+        self._num_processes = num_processes
+        self._live_processes = []
+        
+        self._gpus = {}
+
+        for gpu_id in gpu_ids:
+            self._gpus[gpu_id] = 0
+
+    def allocate_gpu(self):
+        min_count = 99999999999
+        min_id = -1
+        for gpu_id, count in self._gpus.items():
+            if count < min_count:
+                min_id = gpu_id
+                min_count = count
+        
+        if min_id != -1:
+            self._gpus[min_id] += 1
+            return min_id
+        
+        return 0
+
+
+    def release_gpu(self, gpu_id):
+        if gpu_id in self._gpus:
+            self._gpus[gpu_id] -= 1
+
+    def run_and_wait_for_completion(self, experiment, list_of_params):
+        
+        for params in list_of_params:
+            
+            while len(self._live_processes) >= self._num_processes:
+                time.sleep(0.1)
+                completed_procs = [proc for proc in self._live_processes if proc.exitcode is not None]
+
+                for proc in completed_procs:
+                    self.release_gpu(proc.gpu)
+                    self._live_processes.remove(proc)
+            
+            gpu = self.allocate_gpu()
+            proc = self._mp_context.Process(
+                target=invoke_experiment_with_parsed_args, 
+                args=(experiment, {**params, "default_cuda_device": gpu})
+            )
+            proc.gpu = gpu
+            proc.start()
+            self._live_processes.append(proc)
+        
+        while len(self._live_processes) > 0:
+            time.sleep(0.1)
+            completed_procs = [proc for proc in self._live_processes if proc.exitcode is not None]
+
+            for proc in completed_procs:
+                self.release_gpu(proc.gpu)
+                self._live_processes.remove(proc)

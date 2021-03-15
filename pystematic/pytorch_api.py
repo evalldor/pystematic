@@ -16,8 +16,7 @@ import wrapt
 import yaml
 
 from .recording import Recorder
-from .internal import invoke_command_with_parsed_args
-
+from .click_adapter import invoke_experiment_with_parsed_args
 logger = logging.getLogger('PystematicTorch')
 
 class PytorchLogHandler(logging.Handler):
@@ -150,10 +149,10 @@ class PystematicPytorchAPI:
         """Runs an experiment in a new process
         """
 
-        logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
+        logger.debug(f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
 
-        proc = multiprocessing.Process(
-            target=_invoke_command_with_parsed_args, 
+        proc = multiprocessing.get_context('spawn').Process(
+            target=invoke_experiment_with_parsed_args, 
             args=(experiment, params)
         )
 
@@ -209,7 +208,7 @@ class PystematicPytorchAPI:
         experiment = click.get_current_context().command
 
         proc = multiprocessing.Process(
-            target=_invoke_command_with_parsed_args, 
+            target=invoke_experiment_with_parsed_args, 
             args=(experiment, params)
         )
         proc.start()
@@ -565,7 +564,7 @@ class ProcessQueue:
             
             gpu = self.allocate_gpu()
             proc = self._mp_context.Process(
-                target=invoke_command_with_parsed_args, 
+                target=invoke_experiment_with_parsed_args, 
                 args=(experiment, {**params, "default_cuda_device": gpu})
             )
             proc.gpu = gpu
