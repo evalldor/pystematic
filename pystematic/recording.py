@@ -1,5 +1,9 @@
 import torch
 import tensorboardX
+import numpy as np
+from PIL import Image
+import matplotlib.figure
+from matplotlib import pyplot as plt
 
 import pathlib
 
@@ -7,7 +11,7 @@ import pathlib
 class Recorder:
     """Used for recording metrics during training and evaluation."""
 
-    def __init__(self, output_dir=None, tensorboard=True, console=False):
+    def __init__(self, output_dir=None, tensorboard=True, file=True, console=False):
         
         self._counter = 0
 
@@ -17,6 +21,9 @@ class Recorder:
         if tensorboard:
             self._recording_backends.append(TensorboardBackend(self._output_dir))
         
+        if file:
+            self._recording_backends.append(FileBackend(self._output_dir))
+
         if console:
             self._recording_backends.append(ConsoleBackend())
 
@@ -146,31 +153,57 @@ class FileBackend(RecorderBackend):
         self.set_output_dir(output_dir)
 
     def set_output_dir(self, output_dir):
-        self._scalars_file = pathlib.Path(output_dir).joinpath("scalars.csv")
-        self._img_folder = pathlib.Path(output_dir).joinpath("images")
-        self._figures_folder = pathlib.Path(output_dir).joinpath("figures")
+        self._output_dir = output_dir
 
     def step(self):
         pass
 
     def scalar(self, tag, scalar, counter):
-
-        if not self._scalars_file.exists():
-            with self._scalars_file.open("w") as f:
+        scalars_file = pathlib.Path(self._output_dir).joinpath("scalars.csv")
+        
+        if not scalars_file.exists():
+            with scalars_file.open("w") as f:
                 f.write("step, tag, value\n")
 
-        with self._scalars_file.open("a") as f:
+        with scalars_file.open("a") as f:
             f.write(f"{counter}, {tag}, {scalar}\n")
 
 
     def figure(self, tag, fig, counter):
-        self._figures_folder.mkdir(exist_ok=True, parents=True)
-        fig_path = self._figures_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
 
+        
+        figures_folder = pathlib.Path(self._output_dir).joinpath("figures")
+
+        figures_folder.mkdir(exist_ok=True, parents=True)
+        fig_path = figures_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
+
+        if not isinstance(fig, matplotlib.figure.Figure):
+            raise ValueError(f"Figure must be an instance of 'matplotlib.figure.Figure', got '{type(fig)}'.")
+
+        fig.savefig(fig_path)
         
 
     def image(self, tag, image, counter):
-        self._img_folder.mkdir(exist_ok=True, parents=True)
-        img_path = self._img_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
+        img_folder = pathlib.Path(self._output_dir).joinpath("images")
+        img_folder.mkdir(exist_ok=True, parents=True)
+        img_path = img_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
 
+        if isinstance(image, torch.Tensor):
+            image = image.detach().cpu().numpy()
+
+        if isinstance(image, np.ndarray):
+            
+            if len(image.squeeze().shape()) < 2 or len(image.squeeze().shape()) > 3:
+                raise ValueError(f"Invalid image shape '{image.shape}' must have 2 or 3 non-singleton dimensions.")
+            
+            image = image.squeeze()
+
+            if len(image.shape) == 3:
+                image = image.transpose((1, 2, 0)) # CHW -> HWC
+            
+            image = Image.fromarray(image)
+
+        if not isinstance(image, Image.Image):
+            raise ValueError(f"Image is of unsupported type: '{type(image)}'.")
         
+        image.save(img_path)
