@@ -14,6 +14,7 @@ import numpy as np
 import torch
 import wrapt
 import yaml
+import tqdm
 
 from .recording import Recorder
 from .click_adapter import invoke_experiment_with_parsed_args, get_current_experiment
@@ -78,13 +79,17 @@ def run_experiment(experiment, **params) -> multiprocessing.Process:
     return proc
 
 
-def run_experiments_in_pool(pool_size, experiment, list_of_params) -> None:
+def run_experiments_in_pool(pool_size, experiment, list_of_params, num_gpus_per_process=None) -> None:
     """Runs an experiment with a set of different params. At most pool_size
     processes will exist simultaneously
     """
 
     # logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
+    def init_process(gpu_scheduler):
+        import os
 
+        os.environ["CUDA_VISIBLE_DEVICES"] = gpu_scheduler.get_
+        
 
     pool = ProcessQueue(pool_size, range(torch.cuda.device_count()))
     pool.run_and_wait_for_completion(experiment, list_of_params)
@@ -155,6 +160,15 @@ def place_on_correct_device(*args):
             res.append(arg)
     return res
 
+def iterate(iterable):
+    """Returns a wrapper around the iterator that show a progessbar (tqdm).
+    The progessbar is silenced in non-master processes.
+    """
+
+    if is_master():
+        return tqdm.tqdm(iterable, leave=True)
+    
+    return iterable
 
 #
 # Pytorch distributed
@@ -553,7 +567,6 @@ class ProcessQueue:
         
         return 0
 
-
     def release_gpu(self, gpu_id):
         if gpu_id in self._gpus:
             self._gpus[gpu_id] -= 1
@@ -586,3 +599,18 @@ class ProcessQueue:
             for proc in completed_procs:
                 self.release_gpu(proc.gpu)
                 self._live_processes.remove(proc)
+
+
+# @contextmanager
+# def env(**env):
+#     original_environ = os.environ.copy()
+#     os.environ.update(env)
+#     yield
+#     os.environ.clear()
+#     os.environ.update(original_environ)
+
+class ProcessPool:
+    pass
+
+class Task:
+    pass

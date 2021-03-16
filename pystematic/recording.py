@@ -1,11 +1,10 @@
-import torch
-import tensorboardX
-import numpy as np
-from PIL import Image
-import matplotlib.figure
-from matplotlib import pyplot as plt
-
 import pathlib
+
+import matplotlib.figure
+import numpy as np
+import tensorboardX
+import torch
+from PIL import Image
 
 
 class Recorder:
@@ -170,8 +169,6 @@ class FileBackend(RecorderBackend):
 
 
     def figure(self, tag, fig, counter):
-
-        
         figures_folder = pathlib.Path(self._output_dir).joinpath("figures")
 
         figures_folder.mkdir(exist_ok=True, parents=True)
