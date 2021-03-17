@@ -21,7 +21,7 @@ your experiment with the :code:`experiment` decorator:
    import pystematic
 
    @pystematic.experiment
-   def my_experiment(parameters):
+   def my_experiment(params, context):
       print("Hello from my_experiment")
 
 We will discuss the arguments to the function shortly. To be able to run the
