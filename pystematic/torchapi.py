@@ -68,22 +68,11 @@ def seed_known_random_generators() -> None:
 
 def run_parameter_sweep(experiment, list_of_params, max_num_processes=1, num_gpus_per_process=None) -> None:
     """Runs an experiment with a set of different params. At most
-    max_num_subprocesses processes will exist simultaneously
+    :param:`max_num_processes` processes will exist simultaneously
     """
-
-    # logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
 
     pool = utils.ProcessQueue(max_num_processes, range(torch.cuda.device_count()))
     pool.run_and_wait_for_completion(experiment, list_of_params)
-    # def runner(experiment, params):
-    #     try:
-    #         return _invoke_command_with_parsed_args(experiment, params)
-    #     except Exception as e:
-    #         logger.exception(e)
-
-    # # joblib.Parallel(n_jobs=pool_size)(joblib.delayed(runner)(params) for params in list_of_params)
-    # with multiprocessing.Pool(pool_size) as pool:
-    #     pool.starmap(runner, itertools.product((experiment.name,), list_of_params))
 
 
 def run_experiment(experiment, **params) -> multiprocessing.Process:
@@ -422,8 +411,7 @@ def _initialize(_params):
         output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
         params_file.__wrapped__ = pathlib.Path(params["subprocess"])
     else:
-        output_dir.__wrapped__ = _create_log_dir_name(
-            params["output_dir"], get_current_experiment().experiment_name)
+        output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], get_current_experiment().experiment_name)
         output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
         params_file.__wrapped__ = output_dir.joinpath("parameters.yml")
 

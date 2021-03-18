@@ -55,21 +55,29 @@ class ProcessQueue:
 
         self._gpu_resource = Resource(gpu_ids)
 
+    def _wait(self):
+        sentinels = [proc.sentinel for proc in self._live_processes]
+        finished_sentinels = multiprocessing.connection.wait(sentinels)
+
+        completed_procs = []
+        
+        for proc in self._live_processes:
+            if proc.sentinel in finished_sentinels:
+                completed_procs.append(proc)
+
+        for proc in completed_procs:
+            self._gpu_resource.free(proc.gpus)
+            self._live_processes.remove(proc)
+
     def run_and_wait_for_completion(self, experiment, list_of_params):
 
         for params in list_of_params:
 
             while len(self._live_processes) >= self._num_processes:
-                time.sleep(0.1)
-                completed_procs = [proc for proc in self._live_processes if proc.exitcode is not None]
-
-                for proc in completed_procs:
-                    self._gpu_resource.free(proc.gpus)
-                    self._live_processes.remove(proc)
+                self._wait()
 
             gpus = self._gpu_resource.allocate(1)
 
-            
             with envvars({"CUDA_VISIBLE_DEVICES": ",".join([str(id) for id in gpus])}):
                 proc = self._mp_context.Process(
                     target=invoke_experiment_with_parsed_args,
@@ -80,13 +88,7 @@ class ProcessQueue:
                 self._live_processes.append(proc)
 
         while len(self._live_processes) > 0:
-            time.sleep(0.1)
-            completed_procs = [
-                proc for proc in self._live_processes if proc.exitcode is not None]
-
-            for proc in completed_procs:
-                self._gpu_resource.free(proc.gpus)
-                self._live_processes.remove(proc)
+            self._wait()
 
 
 

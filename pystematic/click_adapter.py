@@ -240,6 +240,12 @@ def make_experiment_decorator(default_parameters, experiment_callback):
         else:
             return decorator
 
+    # Make documentation tools show stuff from experiment callback
+    experiment_constructor.__doc__ = experiment_callback.__doc__
+    experiment_constructor.__module__ = experiment_callback.__module__
+    experiment_constructor.__name__ = experiment_callback.__name__
+    experiment_constructor.__qualname__ = experiment_callback.__qualname__
+
     return experiment_constructor
 
 
