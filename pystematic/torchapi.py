@@ -8,6 +8,8 @@ import typing
 import string
 import time
 import atexit
+import contextlib
+import os
 
 import click
 import numpy as np
@@ -18,6 +20,8 @@ import tqdm
 
 from .recording import Recorder
 from .click_adapter import invoke_experiment_with_parsed_args, get_current_experiment
+from . import utils
+
 
 logger = logging.getLogger('pystematic_torch')
 
@@ -69,7 +73,7 @@ def run_parameter_sweep(experiment, list_of_params, max_num_processes=1, num_gpu
 
     # logger.debug(f"Running experiment '{experiment.name}' with arguments {params}.")
 
-    pool = ProcessQueue(max_num_processes, range(torch.cuda.device_count()))
+    pool = utils.ProcessQueue(max_num_processes, range(torch.cuda.device_count()))
     pool.run_and_wait_for_completion(experiment, list_of_params)
     # def runner(experiment, params):
     #     try:
@@ -91,8 +95,7 @@ def run_experiment(experiment, **params) -> multiprocessing.Process:
 
     """
 
-    logger.debug(
-        f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
+    logger.debug(f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
 
     proc = multiprocessing.get_context('spawn').Process(
         target=invoke_experiment_with_parsed_args,
@@ -147,7 +150,9 @@ def launch_subprocess(**additional_params) -> multiprocessing.Process:
 
 def is_subprocess() -> bool:
     """Returns true if this process is a subprocess. I.e. it has been
-    launched by a call to :func:`launch_subprocess` in a parent process."""
+    launched by a call to :func:`launch_subprocess` in a parent process.
+    """
+
     return params["subprocess"] is not None
 
 
@@ -194,8 +199,8 @@ def init_distributed() -> None:
     global_rank = params["nproc_per_node"] * params["node_rank"] + local_rank
     world_size = params["nproc_per_node"] * params["nnodes"]
 
-    logger.debug(
-        f"Initializing distributed runtime (world size '{world_size}', local rank '{local_rank}', global rank '{global_rank}')...")
+    logger.debug(f"Initializing distributed runtime (world size '{world_size}', "
+                  "local rank '{local_rank}', global rank '{global_rank}')...")
 
     torch.cuda.set_device(local_rank)
 
@@ -300,8 +305,7 @@ class TorchContext:
         if name in self._items:
             return self._items[name].handle
 
-        raise AttributeError(
-            f"TorchContext does not have an attribute named '{name}'.")
+        raise AttributeError(f"TorchContext does not have an attribute named '{name}'.")
 
     def __setattr__(self, name, value):
         self.add(name, value)
@@ -326,25 +330,22 @@ class TorchContext:
 
         if name in dir(self):
             raise ValueError(f"'{name}' is not allowed as an identifier because it "
-                             "is used by the context object itself.")
+                              "is used by the context object itself.")
 
         if name in self._checkpoint:
             if checkpoint:
 
-                logger.debug(
-                    f"Loading parameters from checkpoint for '{name}'.")
+                logger.debug(f"Loading parameters from checkpoint for '{name}'.")
                 item = _load_state_dict_into_item(item, self._checkpoint[name])
             else:
-                logger.debug(
-                    f"Not loading item '{name}' from checkpoint due to item specific config.")
+                logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
 
         if params["cuda"] and callable(getattr(item, "cuda", None)):
             if cuda:
                 logger.debug(f"Moving '{name}' to CUDA.")
                 item = item.cuda()
             else:
-                logger.debug(
-                    f"Not moving item '{name}' to cuda due to item specific config.")
+                logger.debug(f"Not moving item '{name}' to cuda due to item specific config.")
 
         if isinstance(item, torch.nn.Module):
             if params["distributed"] and any([p.requires_grad for p in item.parameters()]):
@@ -384,8 +385,7 @@ class TorchContext:
                         "native_value": item.handle
                     }
             else:
-                logger.debug(
-                    f"Not saving item '{name}' to checkpoint due to item specific config.")
+                logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
 
         return dict_with_state
 
@@ -397,8 +397,7 @@ class TorchContext:
                 item.handle = _load_state_dict_into_item(
                     item.handle, self._checkpoint[name])
             else:
-                logger.debug(
-                    f"Not loading item '{name}' from checkpoint due to item specific config.")
+                logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
 
 
 #
@@ -414,7 +413,7 @@ def _initialize(_params):
     else:
         log_level = "INFO"
 
-    logging.basicConfig(level=log_level, handlers=[PytorchLogHandler()])
+    logging.basicConfig(level=log_level, handlers=[utils.PytorchLogHandler()])
 
     params.__wrapped__ = _params
 
@@ -442,8 +441,6 @@ def _initialize(_params):
 
     if params["distributed"]:
         init_distributed()
-    elif params["default_cuda_device"] is not None:
-        torch.cuda.set_device(params["default_cuda_device"])
 
 
 def _cleanup():
@@ -548,107 +545,3 @@ def _create_log_dir_name(output_dir, experiment_name):
 
     return directory
 
-
-class PytorchLogHandler(logging.Handler):
-    """Handle logging for both single- and multiprocess contexts."""
-
-    def __init__(self):
-        super().__init__()
-        self._colors = {
-            'DEBUG':    'magenta',
-            'INFO':     'blue',
-            'WARNING':  'yellow',
-            'ERROR':    'red'
-        }
-
-    def handle(self, record):
-        level = click.style(f"[{record.levelname}]",
-                            fg=self._colors[record.levelname])
-        msg = click.style(f"{record.getMessage()}", fg="white")
-
-        name = click.style(f"[{record.name}]", fg="green")
-
-        if torch.distributed.is_initialized():
-            rank = click.style(
-                f"[RANK {torch.distributed.get_rank()}]", fg="green")
-            click.echo(f"{level} {rank} {name} {msg}")
-        else:
-            click.echo(f"{level} {name} {msg}")
-
-
-class ProcessQueue:
-
-    def __init__(self, num_processes, gpu_ids=[]):
-        self._mp_context = multiprocessing.get_context('spawn')
-        self._num_processes = num_processes
-        self._live_processes = []
-
-        self._gpus = {}
-
-        for gpu_id in gpu_ids:
-            self._gpus[gpu_id] = 0
-
-    def allocate_gpu(self):
-        min_count = 99999999999
-        min_id = -1
-        for gpu_id, count in self._gpus.items():
-            if count < min_count:
-                min_id = gpu_id
-                min_count = count
-
-        if min_id != -1:
-            self._gpus[min_id] += 1
-            return min_id
-
-        return 0
-
-    def release_gpu(self, gpu_id):
-        if gpu_id in self._gpus:
-            self._gpus[gpu_id] -= 1
-
-    def run_and_wait_for_completion(self, experiment, list_of_params):
-
-        for params in list_of_params:
-
-            while len(self._live_processes) >= self._num_processes:
-                time.sleep(0.1)
-                completed_procs = [
-                    proc for proc in self._live_processes if proc.exitcode is not None]
-
-                for proc in completed_procs:
-                    self.release_gpu(proc.gpu)
-                    self._live_processes.remove(proc)
-
-            gpu = self.allocate_gpu()
-            proc = self._mp_context.Process(
-                target=invoke_experiment_with_parsed_args,
-                args=(experiment, {**params, "default_cuda_device": gpu})
-            )
-            proc.gpu = gpu
-            proc.start()
-            self._live_processes.append(proc)
-
-        while len(self._live_processes) > 0:
-            time.sleep(0.1)
-            completed_procs = [
-                proc for proc in self._live_processes if proc.exitcode is not None]
-
-            for proc in completed_procs:
-                self.release_gpu(proc.gpu)
-                self._live_processes.remove(proc)
-
-
-# @contextmanager
-# def env(**env):
-#     original_environ = os.environ.copy()
-#     os.environ.update(env)
-#     yield
-#     os.environ.clear()
-#     os.environ.update(original_environ)
-
-class ProcessPool:
-    pass
-
-
-class Task:
-    pass

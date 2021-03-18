@@ -177,14 +177,6 @@ pytorch_options = [
     click.Option(["--cuda/--nocuda"],
         default=True,
     ),
-    Parameter(
-        name="default_cuda_device",
-        type=int,
-        default=None,
-        help="If set, this will be the default cuda device configured "
-            "for pytorch. Ignored when running in distributed mode.",
-        allow_from_params_file=False
-    ),
     
     Label("Distributed"),
     Parameter(
