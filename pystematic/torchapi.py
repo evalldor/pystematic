@@ -8,10 +8,7 @@ import typing
 import string
 import time
 import atexit
-import contextlib
-import os
 
-import click
 import numpy as np
 import torch
 import wrapt
@@ -49,7 +46,7 @@ context = wrapt.ObjectProxy(None)
 
 def new_seed(nbits=32) -> int:
     """Use this function to generate random numbers seeded by the experiment
-    parameter `random_seed`. Expected use is to seed your own random number
+    parameter ``random_seed``. Expected use is to seed your own random number
     generators.
     """
     return random_gen.getrandbits(nbits)
@@ -68,7 +65,7 @@ def seed_known_random_generators() -> None:
 
 def run_parameter_sweep(experiment, list_of_params, max_num_processes=1, num_gpus_per_process=None) -> None:
     """Runs an experiment with a set of different params. At most
-    :param:`max_num_processes` processes will exist simultaneously
+    :obj:`max_num_processes` concurrent processes will be used.
     """
 
     pool = utils.ProcessQueue(max_num_processes, range(torch.cuda.device_count()))
@@ -82,6 +79,9 @@ def run_experiment(experiment, **params) -> multiprocessing.Process:
         experiment: A handle to the experiment to run. 
         **params: The parameters to pass to the experiment.
 
+    Returns:
+        A handle to the process object. Not that the process is started before
+        it is returned.
     """
 
     logger.debug(f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
@@ -111,7 +111,8 @@ def launch_subprocess(**additional_params) -> multiprocessing.Process:
         seed as the current process. If this is not what you want, you
         should pass a new seed to this function in the ``random_seed`` parameter. 
 
-        E.g: :code:`ps.launch_subprocess(random_seed=ps.new_seed())`
+        E.g.:
+        >>> pystematic.launch_subprocess(random_seed=pystematic.new_seed())
 
     """
     logger.debug("Launching subprocess...")
@@ -123,14 +124,11 @@ def launch_subprocess(**additional_params) -> multiprocessing.Process:
 
     subprocess_params["subprocess"] = str(params_file)
 
-    logger.debug(
-        f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
-
-    experiment = click.get_current_context().command._experiment_main_func
+    logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
 
     proc = multiprocessing.Process(
         target=invoke_experiment_with_parsed_args,
-        args=(experiment, subprocess_params)
+        args=(get_current_experiment(), subprocess_params)
     )
     proc.start()
 
@@ -177,6 +175,9 @@ def iterate(iterable):
 #
 
 def init_distributed() -> None:
+    """Initializes a distributed runtime. This function is called automatically 
+    during initialization if the parameter ``distributed`` is set to ``True``.
+    """
     if params["local_rank"] is None:
         for i in range(1, params["nproc_per_node"]):
             launch_subprocess(local_rank=i)
@@ -244,9 +245,10 @@ def distributed_barrier() -> None:
 #
 
 def save_checkpoint(filename) -> None:
-    """Saves registered items to a file. All items that have a function
-    named ``state_dict`` will be saved by calling that function and saving the
-    returned value.
+    """Saves registered items to a file. All items that have a function named
+    ``state_dict`` will be saved by calling that function and saving the
+    returned value. This function will make sure to only save the checkpoint in
+    the master process when called in distributed mode.
     """
 
     if is_master():
@@ -276,13 +278,24 @@ class ContextItem:
     handle: typing.Any  # A handle to the actual item / object
 
     cuda: bool = True  # Can be used to disable cuda movement for specific items
-    # Set to False to exclude this item from being saved and loaded from checkpoints
-    checkpoint: bool = True
+    
+    checkpoint: bool = True # Set to False to exclude this item from being saved and loaded from checkpoints
 
 
 class TorchContext:
     """A context object that helps with managing the different kinds of objects
     you need during a pytorch session.
+
+    A context object is used to gather all the different types of object you
+    need during a pytorch training session. It also help you with transparently
+    transform the objects you add to accomodate for things such as use of cuda,
+    use of distributed models.
+
+    A context object makes use of the following parameters to determine how
+    objects should be handled:
+
+    - cuda
+    - distributed
 
     """
 
@@ -323,7 +336,6 @@ class TorchContext:
 
         if name in self._checkpoint:
             if checkpoint:
-
                 logger.debug(f"Loading parameters from checkpoint for '{name}'.")
                 item = _load_state_dict_into_item(item, self._checkpoint[name])
             else:
@@ -351,8 +363,7 @@ class TorchContext:
             if not is_master():
                 item.silence()
 
-        self._items[name] = ContextItem(
-            handle=item, cuda=cuda, checkpoint=checkpoint)
+        self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
 
     def state_dict(self):
         dict_with_state = {
@@ -383,8 +394,7 @@ class TorchContext:
 
         for name, item in self._items.items():
             if item.checkpoint:
-                item.handle = _load_state_dict_into_item(
-                    item.handle, self._checkpoint[name])
+                item.handle = _load_state_dict_into_item(item.handle, self._checkpoint[name])
             else:
                 logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
 
@@ -459,13 +469,13 @@ def _load_state_dict_into_item(item, state_dict):
 
     if callable(getattr(item, "load_state_dict", None)):
         if isinstance(item, torch.nn.parallel.DistributedDataParallel):
-            item.module.load_state_dict(
-                _move_to_same_device_as(state_dict, item.module))
+            item.module.load_state_dict(_move_to_same_device_as(state_dict, item.module))
         else:
             item.load_state_dict(_move_to_same_device_as(state_dict, item))
 
     elif isinstance(item, _supported_types):
         return state_dict["native_value"]
+        
     else:
         logger.debug(f"Cannot checkpoint object of type '{type(item)}'")
 
@@ -523,12 +533,11 @@ def _move_to_device(obj, device):
 
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    directory = pathlib.Path(output_dir).resolve().joinpath(
-        experiment_name).joinpath(current_time)
+    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
     if directory.exists():
-        suffix = "".join(random.SystemRandom().choice(
-            string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(6))
+        chars = string.ascii_uppercase + string.ascii_lowercase + string.digits
+        suffix = "".join(random.SystemRandom().choice(chars) for _ in range(6))
         directory = directory.with_name(f"{directory.name}-{suffix}")
 
     return directory

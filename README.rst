@@ -5,6 +5,8 @@ TODO
 ====
 
 - !!python/tuple
+- make context manually created. Make checkpoint loading manual. 
+  Add global property checkpoint
 
 CLI
 ---

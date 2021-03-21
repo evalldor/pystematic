@@ -33,7 +33,7 @@ class ExperimentClickCommand(click.Command):
         super().__init__(name, **attrs)
     
     def format_options(self, ctx, formatter):
-        """Writes all the options into the formatter if they exist. Allows for
+        """Writes all parameters into the formatter if they exist. Allows for
         `Label` options.
         """
 
@@ -73,12 +73,6 @@ class ExperimentCollection(click.Group):
         super().__init__(*args, **kwargs)
 
     def format_usage(self, ctx, formatter):
-        """Writes the usage line into the formatter.
-
-        This is a low-level method called by :meth:`get_usage`.
-        """
-        pieces = self.collect_usage_pieces(ctx)
-        # formatter.write_usage(ctx.command_path, " ".join(pieces))
         formatter.write_usage(ctx.command_path, "[OPTIONS] EXPERIMENT_NAME [PARAMETERS]")
     
     def format_help_text(self, ctx, formatter):
@@ -86,9 +80,11 @@ class ExperimentCollection(click.Group):
         
         formatter.write_paragraph()
         with formatter.indentation():
-            help_text = inspect.cleandoc("""Pystematic global entrypoint. Below is a list of all registered
-                                            experiments. Append the name of the experiment you would like to
-                                            run to the commandline you invoked to run this script.""")
+            help_text = inspect.cleandoc("""
+                Pystematic global entrypoint. Below is a list of all registered
+                experiments. Append the name of the experiment you would like to
+                run to the command line you invoked to run this script.
+            """)
             formatter.write_text(help_text)
 
     def format_commands(self, ctx, formatter):
@@ -130,8 +126,27 @@ def parameter_decorator(
     allow_from_params_file=True, 
     multiple=False,
     **advanced_args):
-    """Decorator for adding parameters to an experiment
+    """Adds a parameter to an experiment.
 
+    Args:
+        name (str): The name of the parameter. The name should use the 
+            snake_case naming convention.
+        help (str, optional): A help text for the parameter that will be 
+            shown on the command line. Defaults to None.
+        type (type, optional): The type of the parameter. Defaults to str.
+        is_flag (bool, optional): When set to True, this parameter is assumed 
+            to be a boolean flag. A flag parameter does not need to be given a 
+            value on the command line. Its mere presence on the command line will 
+            automatically assign it the value True. Defaults to False.
+        default (type, optional): The default value of the parameter. 
+            Defaults to None.
+        required (bool, optional): Set to True if this parameter is required. 
+            Defaults to False.
+        allow_from_params_file (bool, optional): Allow or deny loading the 
+            parameter from a parameters file. Defaults to True.
+        multiple (bool, optional): When set to True, the parameter may appear 
+            many times on the command line. It's value will be a list of values 
+            given. Defaults to False.
     """
     def decorator(experiment):
         kwargs = {
@@ -163,10 +178,6 @@ def global_entrypoint():
     main script, simply call this function to access the CLI for all registered
     experiments.
     """
-    """pystematic global entrypoint. Below is a list of all registered
-    experiments. Append the name of the experiment you would like to run to the
-    commandline you invoked to run this script.
-    """
     pass
 
 
@@ -197,7 +208,20 @@ def add_parameter_to_experiment(experiment, parameter):
 def make_experiment_decorator(default_parameters, experiment_callback):
 
     def experiment_constructor(experiment_main_func=None, *, name=None, inherit_params=None, defaults=None, **kwargs):
+        """Use this decorator to declare a new experiment. The decorated
+        function will become the experiment's main function, and must take
+        exactly one argument, which is a dict containing the values of all 
+        parameters.
 
+        Args: 
+            name (str, optional): The name of the experiment. Defaults to the
+                name of the decorated function. 
+            inherit_params (function, optional): If you want this experiment to 
+                inherit all parameters from another experiment, you pass that experiments 
+                main function here. Defaults to None. 
+            defaults (dict, optional): Override the default values for any parameters. Defaults to None.
+
+        """
         kwargs["context_settings"] = { # These are passed to the click Command class,
             "default_map": defaults, 
             "show_default": True
@@ -241,10 +265,10 @@ def make_experiment_decorator(default_parameters, experiment_callback):
             return decorator
 
     # Make documentation tools show stuff from experiment callback
-    experiment_constructor.__doc__ = experiment_callback.__doc__
-    experiment_constructor.__module__ = experiment_callback.__module__
-    experiment_constructor.__name__ = experiment_callback.__name__
-    experiment_constructor.__qualname__ = experiment_callback.__qualname__
+    # experiment_constructor.__doc__ = experiment_callback.__doc__
+    # experiment_constructor.__module__ = experiment_callback.__module__
+    # experiment_constructor.__name__ = experiment_callback.__name__
+    # experiment_constructor.__qualname__ = experiment_callback.__qualname__
 
     return experiment_constructor
 

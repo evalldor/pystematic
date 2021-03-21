@@ -4,7 +4,7 @@ API documentation
 Decorators and entrypoint
 -------------------------
 
-.. autodecorator:: pystematic.experiment
+.. autodecorator:: pystematic.experiment(*, name=None, inherit_params=None, defaults=None)
 
 .. autodecorator:: pystematic.parameter
 
@@ -25,14 +25,16 @@ they are uninitialized until an experiment has actually started.
     :annotation: : pathlib.Path
 
     Holds a :code:`pathlib.Path` object that points to the current output
-    directory. All output from an experiment should be written to this
-    folder.
+    directory. All output from an experiment should be written to this folder.
+    All internal procedures that produce output will always write it to this
+    folder. When you want to output something persistent from the experiment
+    yourself, it is your responsibly to use this output directory.
 
 
 .. autodata:: pystematic.params 
     :annotation: : dict
 
-    Holds the parameters of the current experiment
+    Holds a dict of all parameters of the current experiment.
 
 
 .. autodata:: pystematic.context
@@ -46,6 +48,8 @@ General
 .. autofunction:: pystematic.new_seed
 
 .. autofunction:: pystematic.run_experiment
+
+.. autofunction:: pystematic.run_parameter_sweep
 
 .. autofunction:: pystematic.launch_subprocess
 

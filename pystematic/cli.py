@@ -181,7 +181,7 @@ pytorch_options = [
     Label("Distributed"),
     Parameter(
         name="distributed",
-        help="Launch in distributed mode",
+        help="Launch in distributed mode.",
         is_flag=True,
         default=False,
         allow_from_params_file=False
@@ -189,8 +189,11 @@ pytorch_options = [
     Parameter(
         name="local_rank", 
         type=int,
-        help="For distributed training, gives the local rank for this process.",
-        allow_from_params_file=False
+        help="For distributed training, gives the local rank for this process. "
+             "This parameter is set automatically by the framework, and should not "
+             "be used manually.",
+        allow_from_params_file=False,
+        hidden=True
     ),
     Parameter(
         name="nproc_per_node",
@@ -241,7 +244,6 @@ pytorch_options = [
 # experiment = make_experiment_decorator(general_options, BasicContext)
 
 def pytorch_experiment_initializer(experiment_main, params):
-    
     torchapi._initialize(params)
 
     return experiment_main(params, torchapi.context)

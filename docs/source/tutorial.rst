@@ -1,6 +1,37 @@
 Tutorial
 ========
 
+Introduction
+------------
+
+When you start out experimenting with machine learning, you quickly find
+yourself in an ocean of training-runs, all with different hyperparameters. More
+than one time have i been guilty of hard-coding my hyperparamters, running the
+code and tweaking the parameters directly in the source code util i eventually
+lose track of which parameters gave which results. 
+
+This framework is ment to help you in being systematic about how you declare and
+assign values to the parameters of your experiment, and keeping books on what
+result they produced. 
+
+Another major point is to make your experiments reproducible by systematically
+controlling all sources of randomness.
+
+The third goal is to make your experiments more accessible to your collegues by
+standardizing how an experiment is run, and how one passes parameters to the
+experiment. 
+
+We all know that machine learning is a field of rapid progess. One philosophy
+that lies at the foundation of this framework is that it tries stay out of your
+way as much as possible, so that when new, novel types of training-schemes are
+invented, this framework should not stand in your way of implementing them.
+Personally I like to think of it as a library of tools that - when used
+responsibly - can help you achieve the above goals.
+
+
+Defining experiments
+--------------------
+
 The central concept in pystematic is that of an *Experiment*. An experiment
 consists of:
 
@@ -9,12 +40,8 @@ consists of:
 #. and a set of **parameters**, that controls some aspects of the experiments
    behavior.
 
-
-Defining experiments
---------------------
-
-Defining an experiment is super easy. You simple decorate the main function of
-your experiment with the :code:`experiment` decorator:
+Defining an experiment is super easy. You simply decorate the main function of
+your experiment with the :func:`pystematic.experiment` decorator:
 
 .. code-block::
 
@@ -24,9 +51,9 @@ your experiment with the :code:`experiment` decorator:
    def my_experiment(params, context):
       print("Hello from my_experiment")
 
-We will discuss the arguments to the function shortly. To be able to run the
-experiment from the commandline, you add the following at the bottom of your
-source file:
+The main function must take two arguments, which we will discuss shortly. To be
+able to run the experiment from the commandline, you add the following at the
+bottom of your source file:
 
 .. code-block::
 
@@ -35,7 +62,7 @@ source file:
 
 
 Your file now has the capabilities of a full-fledged CLI. The call to
-:code:`pystematic.global_entrypoint()` works as a CLI entrypoint to all
+:func:`pystematic.global_entrypoint()` works as a CLI entrypoint to all
 experiments that you have defined. When you run the file without arguments you
 are presented with a list of all experiments available:
 
@@ -64,7 +91,7 @@ Each experiment has a set of parameters associated with it. If you run:
 
 you will see that the experiment we defined is already equipped with a set of
 default parameters. To add additional parameters to the experiment, you use the
-:code:`parameters` decorator:
+:func:`pystematic.parameter` decorator:
 
 .. code-block::
 
@@ -115,5 +142,12 @@ If you look into the output directory of one of the experiment runs you will
 also notice that there is a file there named ``parameters.yaml``. This file
 contains the value of all parameters when the experiment was run. This means
 that, as long as you write all experiment output to the directory pointed to by
-the property :code:`pystematic.output_dir`, you can keep track of which
+the property :data:`pystematic.output_dir`, you can keep track of which
 paramaters gave which output. Neat!
+
+
+Reproducibility
+---------------
+
+Reproducibility is an integral part of any sort of research, yet it has proven
+to be a challange to reproduce many of the results published in the ML community.
