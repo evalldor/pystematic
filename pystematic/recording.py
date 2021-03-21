@@ -11,7 +11,16 @@ class Recorder:
     """Used for recording metrics during training and evaluation."""
 
     def __init__(self, output_dir=None, tensorboard=True, file=True, console=False):
-        
+        """Used for recording metrics during training and evaluation.
+
+        Args:
+            output_dir (str, optional): The output directory store data in.
+                Defaults to None.
+            tensorboard (bool, optional): If the recorder should write tensorboard logs.
+                Defaults to True.
+            file (bool, optional): If the recorder should write to plain files. Defaults to True.
+            console (bool, optional): If the recorder should write to stdout. Defaults to False.
+        """
         self._counter = 0
 
         self._output_dir = output_dir
@@ -42,7 +51,9 @@ class Recorder:
         self._recording_backends = []
 
     @property
-    def count(self):
+    def count(self) -> int:
+        """Internal counter that represents the x-axis when logging data.
+        """
         return self._counter
 
     @count.setter
@@ -50,7 +61,7 @@ class Recorder:
         self._counter = value
     
     def step(self):
-        """Increases the counter by 1."""
+        """Increases :attr:`count` by 1."""
 
         self._counter += 1
         
@@ -62,6 +73,12 @@ class Recorder:
             backend.params(params_dict)
 
     def scalar(self, tag, scalar):
+        """Logs a scalar value
+
+        Args:
+            tag (str): A string that represents the 'name' of the scalar.
+            scalar (float): The value of the scalar.
+        """
         if torch.is_tensor(scalar):
             scalar = scalar.cpu().item()
         
@@ -71,6 +88,10 @@ class Recorder:
     def figure(self, tag, fig):
         for backend in self._recording_backends:
             backend.figure(tag, fig, self.count)
+
+    def image(self, tag, image):
+        for backend in self._recording_backends:
+            backend.image(tag, image, self.count)
 
     def state_dict(self):
         return {
@@ -87,6 +108,9 @@ class RecorderBackend:
         pass
 
     def step(self):
+        """Called every time the counter in the logger is changed. Can be used
+        to flush buffers etc.
+        """
         pass
     
     def params(self, params_dict):

@@ -42,6 +42,7 @@ they are uninitialized until an experiment has actually started.
 
     Holds the context object for the current experiment.
 
+
 General
 +++++++
 
@@ -54,6 +55,7 @@ General
 .. autofunction:: pystematic.launch_subprocess
 
 .. autofunction:: pystematic.is_subprocess
+
 
 Distributed
 +++++++++++
@@ -79,9 +81,28 @@ Checkpoints
 .. autofunction:: pystematic.load_checkpoint
 
 
+Recording
+----------
+
+.. autoclass:: pystematic.Recorder
+
+    .. autoproperty:: count
+
+    .. automethod:: step
+    
+    .. automethod:: scalar
+
+    .. automethod:: image
+
+    .. automethod:: figure
+
+    .. automethod:: state_dict
+
+    .. automethod:: load_state_dict
+
+
 Components
 ----------
-.. autoclass:: pystematic.Recorder
 
 .. autoclass:: pystematic.Counter
 
