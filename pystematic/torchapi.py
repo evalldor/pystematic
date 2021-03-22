@@ -316,10 +316,10 @@ class TorchContext:
     def __setattr__(self, name, value):
         self.add(name, value)
 
-    def has(self, name):
+    def has(self, name : str):
         return name in self._items
 
-    def add(self, name, item, cuda=True, checkpoint=True):
+    def add(self, name : str, item : typing.Any, cuda=True, checkpoint=True):
         """Adds item :obj:`item` to the context with name :obj:`name`. You
         normally don't call this method manually. It is automatically called
         whenever you add an attribute to this object.
@@ -376,7 +376,7 @@ class TorchContext:
 
         self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
 
-    def state_dict(self):
+    def state_dict(self) -> dict:
         """Returns the combined state_dict of all contained items
 
         Returns:
@@ -405,7 +405,7 @@ class TorchContext:
 
         return dict_with_state
 
-    def load_state_dict(self, state):
+    def load_state_dict(self, state : dict) -> None:
         object.__setattr__(self, "_checkpoint", state)
 
         for name, item in self._items.items():
