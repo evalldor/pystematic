@@ -8,18 +8,31 @@ from PIL import Image
 
 
 class Recorder:
-    """Used for recording metrics during training and evaluation."""
+    """Used for recording metrics during training and evaluation.
+    
+    The recorder has an internal counter :attr:`count` that is recorded
+    together with all values. The count typically represents the
+    'global_step' during training. Remember to increment the counter
+    appropriately.
+
+    Each recorded value is also associated with a ``tag`` that uniquely
+    determines which time series the value should be recorded to. The tag
+    can use slashes ('/') to build hierarchies. E.g. ``train/loss``,
+    ``test/loss`` etc.
+    """
 
     def __init__(self, output_dir=None, tensorboard=True, file=True, console=False):
-        """Used for recording metrics during training and evaluation.
-
+        """
+        
         Args:
             output_dir (str, optional): The output directory store data in.
                 Defaults to None.
-            tensorboard (bool, optional): If the recorder should write tensorboard logs.
+            tensorboard (bool, optional): If the recorder should write tensorboard 
+                logs. Defaults to True.
+            file (bool, optional): If the recorder should write to plain files. 
                 Defaults to True.
-            file (bool, optional): If the recorder should write to plain files. Defaults to True.
-            console (bool, optional): If the recorder should write to stdout. Defaults to False.
+            console (bool, optional): If the recorder should write to stdout. 
+                Defaults to False.
         """
         self._counter = 0
 
@@ -73,7 +86,7 @@ class Recorder:
             backend.params(params_dict)
 
     def scalar(self, tag, scalar):
-        """Logs a scalar value
+        """Logs a scalar value.
 
         Args:
             tag (str): A string that represents the 'name' of the scalar.
@@ -86,10 +99,22 @@ class Recorder:
             backend.scalar(tag, scalar, self.count)
             
     def figure(self, tag, fig):
+        """Logs a matplotlib figure
+
+        Args:
+            tag (str): A string tag
+            fig (Figure): A matplotlib figure
+        """
         for backend in self._recording_backends:
             backend.figure(tag, fig, self.count)
 
     def image(self, tag, image):
+        """Logs an image
+
+        Args:
+            tag (str): The tag
+            image (PIL.Image, np.ndarray, torch.tensor): The image
+        """
         for backend in self._recording_backends:
             backend.image(tag, image, self.count)
 

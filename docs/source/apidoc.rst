@@ -82,7 +82,7 @@ Checkpoints
 
 
 Recording
-----------
+---------
 
 .. autoclass:: pystematic.Recorder
 
@@ -101,6 +101,17 @@ Recording
     .. automethod:: load_state_dict
 
 
+Torch context
+-------------
+    
+.. autoclass:: pystematic.TorchContext
+
+    .. automethod:: add
+
+    .. automethod:: state_dict
+
+    .. automethod:: load_state_dict
+    
 Components
 ----------
 

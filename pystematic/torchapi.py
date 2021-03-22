@@ -283,13 +283,17 @@ class ContextItem:
 
 
 class TorchContext:
-    """A context object that helps with managing the different kinds of objects
-    you need during a pytorch session.
+    """A context object is like a big container that holds all pytorch related
+    objects you need. Its main use is to allow a pytorch session so transition
+    seamlessly between different modes (e.g. distributed, cuda) based on
+    experiment parameters. It does this by transparently transforming some
+    object that you add. For example, when running in distributed mode, all
+    pytorch models added to this context will be automatically wrapped in 
+    torch's :obj:`DistributedDataParallel`.
 
-    A context object is used to gather all the different types of object you
-    need during a pytorch training session. It also help you with transparently
-    transform the objects you add to accomodate for things such as use of cuda,
-    use of distributed models.
+    The methods :meth:`state_dict` and :meth:`load_state_dict` provides a single
+    point of entry to the state of the entire session (provided that all objects
+    are registered with it).
 
     A context object makes use of the following parameters to determine how
     objects should be handled:
@@ -316,7 +320,14 @@ class TorchContext:
         return name in self._items
 
     def add(self, name, item, cuda=True, checkpoint=True):
-        """Adds item :param:`item` to the context with name :param:`name`.
+        """Adds item :obj:`item` to the context with name :obj:`name`. You
+        normally don't call this method manually. It is automatically called
+        whenever you add an attribute to this object.
+
+        For example::
+
+            ctx = pystematic.TorchContext()
+            ctx.model = SomeTorchModel() # This would be the same as ctx.add("model", SomeTorchModel())
 
         Args:
             name (str): The name that the item will be accessible under
@@ -366,6 +377,11 @@ class TorchContext:
         self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
 
     def state_dict(self):
+        """Returns the combined state_dict of all contained items
+
+        Returns:
+            dict: A dict that maps names to state_dicts
+        """
         dict_with_state = {
             "__torch_version": torch.__version__
         }
