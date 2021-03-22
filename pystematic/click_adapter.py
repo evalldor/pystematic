@@ -171,6 +171,17 @@ def parameter_decorator(
     return decorator
 
 
+def label_decorator(name):
+    """This decorator can be used to group parameters of and experiment to give
+    the user a better overview.
+
+    Args: name (str): The name to show in the CLI.
+    """
+    def decorator(experiment):
+        add_parameter_to_experiment(experiment, Label(name))
+
+        return experiment
+    return decorator
 
 @click.group(cls=ExperimentCollection)
 def global_entrypoint():

@@ -68,7 +68,7 @@ def run_parameter_sweep(experiment, list_of_params, max_num_processes=1, num_gpu
     :obj:`max_num_processes` concurrent processes will be used.
     """
 
-    pool = utils.ProcessQueue(max_num_processes, range(torch.cuda.device_count()))
+    pool = utils.ProcessQueue(max_num_processes, range(torch.cuda.device_count()), num_gpus_per_process)
     pool.run_and_wait_for_completion(experiment, list_of_params)
 
 

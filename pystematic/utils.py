@@ -48,9 +48,10 @@ def envvars(env):
 
 class ProcessQueue:
 
-    def __init__(self, num_processes, gpu_ids=[]):
+    def __init__(self, num_processes, gpu_ids=[], num_gpus_per_process=None):
         self._mp_context = multiprocessing.get_context('spawn')
         self._num_processes = num_processes
+        self._num_gpus_per_process = num_gpus_per_process
         self._live_processes = []
 
         self._gpu_resource = Resource(gpu_ids)
@@ -66,7 +67,8 @@ class ProcessQueue:
                 completed_procs.append(proc)
 
         for proc in completed_procs:
-            self._gpu_resource.free(proc.gpus)
+            if self._num_gpus_per_process is not None:
+                self._gpu_resource.free(proc.gpus)
             self._live_processes.remove(proc)
 
     def run_and_wait_for_completion(self, experiment, list_of_params):
@@ -76,14 +78,25 @@ class ProcessQueue:
             while len(self._live_processes) >= self._num_processes:
                 self._wait()
 
-            gpus = self._gpu_resource.allocate(1)
+            if self._num_gpus_per_process is not None:
+                gpus = self._gpu_resource.allocate(self._num_gpus_per_process)
 
-            with envvars({"CUDA_VISIBLE_DEVICES": ",".join([str(id) for id in gpus])}):
+                with envvars({"CUDA_VISIBLE_DEVICES": ",".join([str(id) for id in gpus])}):
+                    proc = self._mp_context.Process(
+                        target=invoke_experiment_with_parsed_args,
+                        args=(experiment, params)
+                    )
+
+                    proc.gpus = gpus
+
+                    proc.start()
+                    self._live_processes.append(proc)
+            else:
                 proc = self._mp_context.Process(
                     target=invoke_experiment_with_parsed_args,
                     args=(experiment, params)
                 )
-                proc.gpus = gpus
+
                 proc.start()
                 self._live_processes.append(proc)
 

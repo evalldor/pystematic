@@ -7,6 +7,8 @@ TODO
 - !!python/tuple
 - make context manually created. Make checkpoint loading manual. 
   Add global property checkpoint
+- Main function should only take params as argument
+  
 
 CLI
 ---
