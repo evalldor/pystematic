@@ -45,6 +45,10 @@ class Looper(abc.ABC):
     `before_loop` and `after_loop` are called before and after the iteration begins/ends.
 
     A single iteration through the while iterator is done by calling the `loop_once` method.
+
+    .. deprecated:: 0.1
+        Use :func:`pystematic.iterate` instead.
+
     """
     @abc.abstractmethod
     def get_iterator(self):

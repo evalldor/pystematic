@@ -105,6 +105,10 @@ class Recorder:
             tag (str): A string tag
             fig (Figure): A matplotlib figure
         """
+
+        if not isinstance(fig, matplotlib.figure.Figure):
+            raise ValueError(f"Figure must be an instance of 'matplotlib.figure.Figure', got '{type(fig)}'.")
+
         for backend in self._recording_backends:
             backend.figure(tag, fig, self.count)
 
@@ -115,6 +119,10 @@ class Recorder:
             tag (str): The tag
             image (PIL.Image, np.ndarray, torch.tensor): The image
         """
+
+        if isinstance(image, torch.Tensor):
+            image = image.detach().cpu().numpy()
+
         for backend in self._recording_backends:
             backend.image(tag, image, self.count)
 
@@ -203,9 +211,6 @@ class FileBackend(RecorderBackend):
     def set_output_dir(self, output_dir):
         self._output_dir = output_dir
 
-    def step(self):
-        pass
-
     def scalar(self, tag, scalar, counter):
         scalars_file = pathlib.Path(self._output_dir).joinpath("scalars.csv")
         
@@ -223,9 +228,6 @@ class FileBackend(RecorderBackend):
         figures_folder.mkdir(exist_ok=True, parents=True)
         fig_path = figures_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
 
-        if not isinstance(fig, matplotlib.figure.Figure):
-            raise ValueError(f"Figure must be an instance of 'matplotlib.figure.Figure', got '{type(fig)}'.")
-
         fig.savefig(fig_path)
         
 
@@ -233,9 +235,6 @@ class FileBackend(RecorderBackend):
         img_folder = pathlib.Path(self._output_dir).joinpath("images")
         img_folder.mkdir(exist_ok=True, parents=True)
         img_path = img_folder.joinpath(f"{tag.replace('/', '.')}-{counter}.jpg")
-
-        if isinstance(image, torch.Tensor):
-            image = image.detach().cpu().numpy()
 
         if isinstance(image, np.ndarray):
             

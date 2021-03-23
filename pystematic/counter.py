@@ -8,6 +8,10 @@ class Counter:
     @property
     def count(self):
         return self._count
+
+    @count.setter
+    def count(self, value):
+        self._counter = value
     
     def step(self):
         """Increments the counter by 1."""
