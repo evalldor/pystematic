@@ -31,8 +31,7 @@ class PytorchLogHandler(logging.Handler):
         name = click.style(f"[{record.name}]", fg="green")
 
         if torch.distributed.is_initialized():
-            rank = click.style(
-                f"[RANK {torch.distributed.get_rank()}]", fg="green")
+            rank = click.style(f"[RANK {torch.distributed.get_rank()}]", fg="green")
             click.echo(f"{level} {rank} {name} {msg}")
         else:
             click.echo(f"{level} {name} {msg}")

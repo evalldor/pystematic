@@ -29,7 +29,6 @@ class Label(click.Option):
 class ExperimentClickCommand(click.Command):
 
     def __init__(self, name, **attrs):
-
         super().__init__(name, **attrs)
     
     def format_options(self, ctx, formatter):
@@ -197,8 +196,8 @@ def get_current_experiment():
 
 
 def get_experiment_parameters(experiment):
-    if isinstance(experiment, click.Command):
-        return experiment.params
+    if hasattr(experiment, "_click_command") and isinstance(experiment._click_command, click.Command):
+        return experiment._click_command.params
     elif hasattr(experiment, "__click_params__"):
         return experiment.__click_params__
     
@@ -211,6 +210,7 @@ def add_parameter_to_experiment(experiment, parameter):
     else:
         if not hasattr(experiment, "__click_params__"):
             experiment.__click_params__ = []
+        
         experiment.__click_params__.append(parameter)
 
     return experiment
