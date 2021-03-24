@@ -206,8 +206,8 @@ def get_experiment_parameters(experiment):
 
 
 def add_parameter_to_experiment(experiment, parameter):
-    if isinstance(experiment, click.Command):
-        experiment.params.append(parameter)
+    if hasattr(experiment, "_click_command") and isinstance(experiment._click_command, click.Command):
+        experiment._click_command.params.append(parameter)
     else:
         if not hasattr(experiment, "__click_params__"):
             experiment.__click_params__ = []
@@ -248,6 +248,9 @@ def make_experiment_decorator(default_parameters, experiment_callback):
 
 
             params = []
+
+            if hasattr(experiment_main_func, "__click_params__"):
+                params += experiment_main_func.__click_params__
 
             if inherit_params is not None:
                 params += get_experiment_parameters(inherit_params)
