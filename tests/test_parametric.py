@@ -67,8 +67,6 @@ def test_parsing():
 def test_parametric():
     params = parametric.ParameterManager()
     
-    params.add_parameter(parametric.CliHelpParameter(params), cli_only=True)
-    
     params.add_param(
         name="pos_1",
         help="A positional arg",
@@ -190,7 +188,7 @@ def test_flag_param():
     params.add_param(
         name="flag_param",
         help="A bool parameter used for testing.",
-        cls=parametric.BooleanFlagParameter
+        behaviour=parametric.BooleanFlagBehaviour()
     )
 
     res = params.from_cli([])

@@ -2,6 +2,8 @@ import argparse
 import dataclasses
 import typing
 
+from . import parametric
+
 class Experiment:
 
     def __init__(self, main_function) -> None:
@@ -19,40 +21,26 @@ class Experiment:
     def cli(self):
         pass
 
-T = typing.TypeVar("T")
-
 @dataclasses.dataclass
 class Parameter:
 
     name: str
-    help: str = ""
-    type: typing.Type[T] = str
+    type: typing.Callable[[str], typing.Any] = str
     
-    default: T = None
+    default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None
     required: bool = False
-    
-    choices: typing.List[typing.Any] = None
+    choices: list[typing.Any] = None
     is_flag: bool = False
     multiple: bool = False
     allow_from_file: bool = True
-    envvar: str = None
-    default_help: str = None
+    envvar: typing.Union[str, None, typing.Literal[False]] = None
+
+    help: typing.Optional[str] = None
+    default_help: typing.Optional[str] = None
 
 
-
-def _construct_argparser(parameters):
-    parser = argparse.ArgumentParser(
-        fromfile_prefix_chars="@"
-    )
-
-    for param in parameters:
-        _add_param_to_parser(param, parser)
-
-    
-    return parser
-
-def _add_param_to_parser(param, parser):
-    cli_name = f"--{param.name.replace('_', '-')}"
+def _create_parameter(param):
+    cls = parametric.Parameter
 
     if param.is_flag:
         if param.choices is not None:
@@ -61,57 +49,32 @@ def _add_param_to_parser(param, parser):
         if param.multiple:
             raise ValueError(f"Error in parameter declaration for '{param.name}': 'is_flag' is incompatible with 'multiple'.")
         
-        parser.add_argument(
-            cli_name, 
-            help=param.help,
-            action=argparse.BooleanOptionalAction,
-            default=param.default,
-            dest=param.name
-        )
-
+        cls = parametric.BooleanFlagParameter
     else:
 
         type = param.type
         nargs = None
-        action = None
         
         if param.choices is not None:
-            type = _choice_type(param.choices)
+            type = parametric.ChoiceType(param.choices)
         elif param.type == bool:
-            type = _bool_type
+            type = parametric.BooleanType
 
         if param.multiple:
-            action = "extend"
             nargs = "*"
 
-        parser.add_argument(
-            cli_name, 
-            help=param.help,
+        param = cls(
+            name=param.name,
             type=type,
+
+            required=param.required,
             default=param.default,
-            choices=param.choices,
-            action=action,
             nargs=nargs,
-            dest=param.name
+
+            help=param.help,
+            default_help=param.default_help
         )
 
-def _bool_type(value):
-    if isinstance(value, bool):
-       return value
-    if value.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        param.allow_from_file = param.allow_from_file
 
-
-def _choice_type(choices):
-    def nested(value):
-        for choice in choices:
-            if str(choice) == str(value):
-                return choice
-        
-        raise argparse.ArgumentTypeError(f"Expected one of [{', '.join(choices)}]")
-
-    return nested
+        return param

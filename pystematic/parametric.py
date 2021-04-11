@@ -58,6 +58,8 @@ class BooleanType:
             return True
         elif str(value).lower() in ('no', 'false', 'f', 'n', '0'):
             return False
+        elif value is None:
+            return False
         
         raise ValueError(f"Boolean value expected, got {value}.")
 
@@ -65,6 +67,53 @@ class BooleanType:
 class IdentityType:
     def __call__(self, value):
         return value
+
+
+class DefaultParameterBehaviour:
+
+    def after_init(self, param, **kwargs):
+        pass
+
+    def on_cli_value(self, param, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
+        self.on_value(param, value, result_dict)
+
+    def on_value(self, param, value:typing.Any, result_dict:dict):
+        result_dict[param.name] = value
+
+
+class CliHelpBehaviour(DefaultParameterBehaviour):
+
+    def __init__(self, param_manager):
+        self.param_manager = param_manager
+
+    def set_cli_value(self, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
+        self.param_manager.print_cli_help()
+        sys.exit(0)
+
+
+class BooleanFlagBehaviour(DefaultParameterBehaviour):
+
+    def after_init(self, param, **kwargs):
+        param.nargs = 0
+        param.type = BooleanType()
+        param.default = False if param.default is None else param.default
+
+        flags = [flag for flag in param.flags if flag.startswith("--")]
+
+        if len(flags) == 0:
+            raise ValueError(f"Error during initialization: expected at least one long flag, got '{param.flags}'.")
+
+        negative_flags = []
+        for flag in flags:
+            negative_flags.append(f"--no-{flag[2:]}")
+
+        param.flags += negative_flags
+    
+    def on_cli_value(self, param, flag: typing.Optional[str], value: typing.Any, result_dict: dict):
+        if flag.startswith("--no-"):
+            result_dict[param.name] = False
+        else:
+            result_dict[param.name] = True
 
 
 class Parameter:
@@ -82,8 +131,12 @@ class Parameter:
         help: typing.Optional[str] = None,
         default_help: typing.Optional[str] = None,
         hidden: bool = False,
-        metavar: typing.Optional[str] = None
-    ) -> None:
+        metavar: typing.Optional[str] = None,
+
+        behaviour: DefaultParameterBehaviour = None,
+
+        **extension_attributes
+    ):
 
         #
         # Validate name
@@ -148,6 +201,9 @@ class Parameter:
             if not isinstance(envvar, str):
                 raise ValueError(f"Invalid envvar type: expected a string.")
 
+        if behaviour is None:
+            behaviour = DefaultParameterBehaviour()
+
         self.name = name
         self.flags = flags
         self.type = type
@@ -161,11 +217,15 @@ class Parameter:
         self.hidden = hidden
         self.metavar = metavar
 
+        self.behaviour = behaviour
+
+        self.behaviour.after_init(self, **extension_attributes)
+
     def set_cli_value(self, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
-        self.set_value(value, result_dict)
+        self.behaviour.on_cli_value(self, flag, self.convert_value(value), result_dict)
 
     def set_value(self, value:typing.Any, result_dict:dict):
-        result_dict[self.name] = self.convert_value(value)
+        self.behaviour.on_value(self, self.convert_value(value), result_dict)
 
     def convert_value(self, value):
         value = self._convert_to_correct_nargs(value)
@@ -189,12 +249,7 @@ class Parameter:
     def _convert_to_correct_type(self, value):
 
         if isinstance(value, (list, tuple)):
-            converted_values = []
-        
-            for val in value:
-                converted_values.append(None if val is None else self.type(val))
-            
-            return converted_values
+            return list(map(lambda val: None if val is None else self.type(val), value))
         
         return None if value is None else self.type(value)
             
@@ -236,53 +291,6 @@ class Parameter:
         return str(self)
 
 
-class CliHelpParameter(Parameter):
-
-    def __init__(self, param_manager):
-        super().__init__(
-            name="__help__", 
-            flags=["-h", "--help"],
-            nargs=0,
-            help="Show this help message and exit."
-        )
-
-        self.param_manager = param_manager
-
-    def set_cli_value(self, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
-        self.param_manager.print_cli_help()
-        sys.exit(0)
-
-
-class BooleanFlagParameter(Parameter):
-
-    def __init__(self, **kwargs):
-        
-        kwargs.update({
-            "default": False if kwargs["default"] is None else kwargs["default"],
-            "type": bool,
-            "nargs": 0
-        })
-
-        super().__init__(**kwargs)
-
-        flags = [flag for flag in self.flags if flag.startswith("--")]
-
-        if len(flags) == 0:
-            raise ValueError(f"Error during initialization: expected at least one long flag, got '{self.flags}'.")
-
-        negative_flags = []
-        for flag in flags:
-            negative_flags.append(f"--no-{flag[2:]}")
-
-        self.flags += negative_flags
-
-    def set_cli_value(self, flag: typing.Optional[str], value: typing.Any, result_dict: dict):
-        if flag.startswith("--no-"):
-            result_dict[self.name] = False
-        else:
-            result_dict[self.name] = True
-
- 
 class ParamValues(collections.UserDict):
 
     def __init__(self, params) -> None:
@@ -310,8 +318,7 @@ class ParamValues(collections.UserDict):
             super().__setitem__(name, value)
         else:
             param = self.name_to_param_map[name]
-            with self.scope(name):
-                param.set_value(value, self)
+            self.set_value(param, value)
 
 
 @dataclasses.dataclass
@@ -332,7 +339,8 @@ class ParameterManager:
         env_prefix=None, 
         env_value_separators=":,",
         cli_help_formatter=None,
-        cli_allow_intermixed_args=False
+        cli_allow_intermixed_args=False,
+        add_cli_help_option=True
     ) -> None:
 
         self._parameters: list[_ParamContainer] = []
@@ -343,8 +351,18 @@ class ParameterManager:
         self.env_value_separators = env_value_separators
 
         self.cli_help_formatter = cli_help_formatter or CliHelpFormatter()
-        self.cli_help_option = CliHelpParameter(self)
+        
         self.cli_allow_intermixed_args = cli_allow_intermixed_args
+
+        if add_cli_help_option:
+            self.add_param(
+                name="__help__", 
+                flags=["-h", "--help"],
+                nargs=0,
+                help="Show this help message and exit.",
+                behaviour=CliHelpBehaviour(self),
+                cli_only=True
+            )
 
     def add_parameter(self, param:Parameter, cli_only=False, cli_positional=False, cli_enabled=True):
         if cli_only and not cli_enabled:
@@ -382,7 +400,7 @@ class ParameterManager:
         hidden: bool = False,
         metavar: typing.Optional[str] = None,
         
-        cls: Parameter = Parameter,
+        behaviour: DefaultParameterBehaviour = None,
         
         cli_only=False, 
         cli_positional=False, 
@@ -390,7 +408,7 @@ class ParameterManager:
 
         **kwargs
     ):
-        param = cls(
+        param = Parameter(
             name=name,
             flags=flags,
             type=type,
@@ -403,6 +421,8 @@ class ParameterManager:
             default_help=default_help,
             hidden=hidden,
             metavar=metavar,
+            
+            behaviour=behaviour,
             
             **kwargs
         )
@@ -422,6 +442,7 @@ class ParameterManager:
 
     def get_cli_positionals(self):
         return [c.param for c in self._parameters if c.cli_enabled and c.cli_positional]
+
 
     def add_defaults(self, result_dict):
         
@@ -470,6 +491,7 @@ class ParameterManager:
             
             if param.required and result_dict[param.name] is None:
                 raise ValueError(f"Parameter '{param.name}' is required.")
+
 
     def from_cli(self, argv=None, defaults=True, env=True):
         result_dict = ParamValues(self.get_parameters())
