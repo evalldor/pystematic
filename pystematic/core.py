@@ -70,6 +70,7 @@ def _add_param_to_parser(param, parser):
         )
 
     else:
+
         type = param.type
         nargs = None
         action = None
@@ -81,7 +82,7 @@ def _add_param_to_parser(param, parser):
 
         if param.multiple:
             action = "extend"
-            nargs = "+"
+            nargs = "*"
 
         parser.add_argument(
             cli_name, 
