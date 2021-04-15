@@ -76,7 +76,7 @@ class ProcessQueue:
 
             while len(self._live_processes) >= self._num_processes:
                 self._wait()
-
+            
             if self._num_gpus_per_process is not None:
                 gpus = self._gpu_resource.allocate(self._num_gpus_per_process)
 
@@ -87,7 +87,7 @@ class ProcessQueue:
                     )
 
                     proc.gpus = gpus
-
+                    time.sleep(2)
                     proc.start()
                     self._live_processes.append(proc)
             else:
@@ -95,9 +95,10 @@ class ProcessQueue:
                     target=invoke_experiment_with_parsed_args,
                     args=(experiment, params)
                 )
-
+                time.sleep(2)
                 proc.start()
                 self._live_processes.append(proc)
+            
 
         while len(self._live_processes) > 0:
             self._wait()
