@@ -62,7 +62,10 @@ def test_parsing():
     # parser.print_help()
 
     parser.parse_args(["woot", "asd", "odn", "fpo", "sdnf", "--multiple-str", "asd", "asdasd", "--flag-param", "1"])
+    res = parser.parse_known_args(["--multiple-str", "asd", "--asdasd", "asdasd", "--flag-param", "1", "woot", "asd", "odn", "fpo", "sdnf"])
+    parser.parse_args(["--multiple-str", "asd", "asdasd", "--flag-param", "1", "woot", "asd", "odn", "fpo", "sdnf", "--int-param", "1"])
 
+    # print(res)
 
 def test_parametric():
     params = parametric.ParameterManager()
@@ -180,8 +183,8 @@ def test_parametric():
     with pytest.raises(Exception):
         res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "-fp", "asd"])
 
-    print()
-    params.print_cli_help()
+    # print()
+    # params.print_cli_help()
 
 def test_flag_param():
     params = parametric.ParameterManager()
@@ -249,3 +252,45 @@ def test_flags():
             name="string_param",
             nargs="k"
         )
+
+def test_parse_shared():
+    params = parametric.ParameterManager()
+    
+    params.add_param(
+        name="pos_1",
+        help="A positional arg",
+        cli_positional=True
+    )
+
+    params.add_param(
+        name="string_param",
+        flags=["--string-param"],
+        help="A string parameter used for testing.",
+    )
+
+    params.add_param(
+        name="multiple_str",
+        flags=["--multiple-str"],
+        help="A string parameter that can be added multiple times.",
+        nargs="*",
+        default=["hej"]
+    )
+
+    res, rest = params.from_shared_cli(["--string-param", "hello", "pos_value", "--string-param", "next", "pos_val_2"])
+
+    assert res["string_param"] == "hello"
+    assert res["pos_1"] == "pos_value"
+    assert rest == ["--string-param", "next", "pos_val_2"]
+
+    res, rest = params.from_shared_cli(rest)
+
+    assert len(rest) == 0
+    assert res["string_param"] == "next"
+    assert res["pos_1"] == "pos_val_2"
+
+
+    res, rest = params.from_shared_cli(["--multiple-str", "one", "two", "--", "pos_value", "--string-param", "next", "pos_val_2"])
+
+    assert rest == ["--string-param", "next", "pos_val_2"]
+    assert res["multiple_str"] == ["one", "two"]
+    assert res["pos_1"] == "pos_value"

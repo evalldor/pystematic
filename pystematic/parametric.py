@@ -13,8 +13,6 @@ param sources:
 - defaults
 """
 
-__version__ = "0.1.0"
-__all__ = []
 
 import collections
 import typing
@@ -22,7 +20,6 @@ import sys
 import re
 import itertools
 import os
-import contextlib
 import dataclasses
 
 OPTIONAL = "?"
@@ -81,12 +78,30 @@ class DefaultParameterBehaviour:
         result_dict[param.name] = value
 
 
+class CompositBehaviour:
+
+    def __init__(self, *behaviours):
+        self.behaviours = behaviours
+
+    def after_init(self, param, **kwargs):
+        for behavour in self.behaviours:
+            behavour.after_init(param, **kwargs)
+
+    def on_cli_value(self, param, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
+        for behavour in self.behaviours:
+            behavour.on_cli_value(param, flag, value, result_dict)
+
+    def on_value(self, param, value:typing.Any, result_dict:dict):
+        for behavour in self.behaviours:
+            behavour.on_value(param, value, result_dict)
+
+
 class CliHelpBehaviour(DefaultParameterBehaviour):
 
     def __init__(self, param_manager):
         self.param_manager = param_manager
 
-    def set_cli_value(self, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
+    def on_cli_value(self, param, flag:typing.Optional[str], value:typing.Any, result_dict:dict):
         self.param_manager.print_cli_help()
         sys.exit(0)
 
@@ -291,44 +306,53 @@ class Parameter:
         return str(self)
 
 
-class ParamValues(collections.UserDict):
+class ParamValueDict(collections.UserDict):
 
-    def __init__(self, params) -> None:
+    def __init__(self, params):
         super().__init__()
         self.params = params
         self.name_to_param_map = {param.name: param for param in params}
-        self.scopes = []
 
-    @contextlib.contextmanager
-    def scope(self, name):
-        self.scopes.insert(0, name)
-        yield
-        self.scopes.pop(0)
+    def get_params(self):
+        return self.params
 
-    def set_value(self, param, value):
-        with self.scope(param.name):
-            param.set_value(value, self)
-
-    def set_cli_value(self, param, flag, value):
-        with self.scope(param.name):
-            param.set_cli_value(flag, value, self)
-
-    def __setitem__(self, name, value):
-        if name not in self.name_to_param_map or (len(self.scopes) > 0 and self.scopes[0] == name):
-            super().__setitem__(name, value)
-        else:
+    def set_value_by_name(self, name, value):
+        if name in self.name_to_param_map:
             param = self.name_to_param_map[name]
             self.set_value(param, value)
+        else:
+            self[name] = value
+
+    def set_value(self, param, value):
+        param.set_value(value, self)
+
+    def set_cli_value(self, param, flag, value):
+        param.set_cli_value(flag, value, self)
 
 
 @dataclasses.dataclass
 class _ParamContainer:
     """Used to store some config together with a param
     """
-    param:Parameter = None
-    cli_enabled:bool = True
-    cli_only:bool = False
-    cli_positional:bool = False
+    param: Parameter = None
+    cli_enabled: bool = True
+    cli_only: bool = False
+    cli_positional: bool = False
+
+
+class ParameterGroup:
+
+    def __init__(self, name, param_manager):
+        pass
+
+    def add_parameter(self):
+        pass
+
+    def add_parameters(self):
+        pass
+
+    def add_param(self):
+        pass
 
 
 class ParameterManager:
@@ -340,7 +364,9 @@ class ParameterManager:
         env_value_separators=":,",
         cli_help_formatter=None,
         cli_allow_intermixed_args=False,
-        add_cli_help_option=True
+        cli_require_options_before_positionals=False,
+        cli_consume_known_params_only=False,
+        add_cli_help_option=True,
     ) -> None:
 
         self._parameters: list[_ParamContainer] = []
@@ -478,11 +504,6 @@ class ParameterManager:
             if param.name in values:
                 result_dict.set_value(param, values[param.name])
 
-    def parse_cli_args(self, argv, result_dict):
-        cli_results = parse_args(argv, self.get_cli_positionals(), self.get_cli_optionals(), self.cli_allow_intermixed_args)
-
-        for param, flag, value in cli_results:
-            result_dict.set_cli_value(param, flag, value)
 
     def validate_values(self, result_dict):
         for param in self.get_parameters():
@@ -492,29 +513,59 @@ class ParameterManager:
             if param.required and result_dict[param.name] is None:
                 raise ValueError(f"Parameter '{param.name}' is required.")
 
-
     def from_cli(self, argv=None, defaults=True, env=True):
-        result_dict = ParamValues(self.get_parameters())
+        result_dict = ParamValueDict(self.get_parameters())
 
         if argv is None:
             argv = sys.argv[1:]
 
-        self.parse_cli_args(argv, result_dict)
-        self.add_env_values(result_dict)
-        self.add_defaults(result_dict)
+        cli_results = parse_args(argv, self.get_cli_positionals(), self.get_cli_optionals())
+        
+        for param, flag, value in cli_results:
+            result_dict.set_cli_value(param, flag, value)
+
+        if env:
+            self.add_env_values(result_dict)
+        if defaults:
+            self.add_defaults(result_dict)
+        
         self.validate_values(result_dict)
 
-        return result_dict
+        return dict(result_dict)
+
+    def from_shared_cli(self, argv=None, defaults=True, env=True):
+        result_dict = ParamValueDict(self.get_parameters())
+
+        if argv is None:
+            argv = sys.argv[1:]
+
+        cli_results, argv_rest = parse_shared_args(argv, self.get_cli_positionals(), self.get_cli_optionals())
+        
+        for param, flag, value in cli_results:
+            result_dict.set_cli_value(param, flag, value)
+
+        if env:
+            self.add_env_values(result_dict)
+        if defaults:
+            self.add_defaults(result_dict)
+
+        self.validate_values(result_dict)
+
+        return dict(result_dict), argv_rest
 
     def from_dict(self, values, defaults=True, env=True):
-        result_dict = ParamValues(self.get_parameters())
+        result_dict = ParamValueDict(self.get_parameters())
 
         self.add_dict_values(values, result_dict)
-        self.add_env_values(result_dict)
-        self.add_defaults(result_dict)
+
+        if env:
+            self.add_env_values(result_dict)
+        if defaults:
+            self.add_defaults(result_dict)
+        
         self.validate_values(result_dict)
 
-        return result_dict
+        return dict(result_dict)
 
     def print_cli_usage(self):
         self.cli_help_formatter.print_usage(self.get_cli_positionals(), self.get_cli_optionals())
@@ -559,9 +610,13 @@ class CliHelpFormatter:
     def print_help(self, positionals, optionals):
         self.print_usage(positionals, optionals)
         print()
-        self._print_positionals_help(positionals)
-        print()
-        self._print_optionals_help(optionals)
+
+        if len(positionals) > 0:
+            self._print_positionals_help(positionals)
+            print()
+        
+        if len(optionals) > 0:
+            self._print_optionals_help(optionals)
 
     def _format_metavar(self, param, metavar="<value>"):
 
@@ -585,7 +640,7 @@ class CliHelpFormatter:
     def _print_positionals_help(self, positionals):
         grid = Table(
             box=None,
-            padding=(0, 1),
+            padding=(0, 1, 0, 0),
             show_header=False,
             show_footer=False,
             show_edge=False,
@@ -604,7 +659,7 @@ class CliHelpFormatter:
     def _print_optionals_help(self, optionals):
         grid = Table(
             box=None,
-            padding=(0, 1),
+            padding=(0, 1, 0, 0),
             show_header=False,
             show_footer=False,
             show_edge=False,
@@ -616,23 +671,24 @@ class CliHelpFormatter:
         grid.add_column()
 
         for param in optionals:
-            flags = []
-            for flag in param.get_short_flags() + param.get_long_flags():
-                flags.append(f"[flag]{flag}[/flag]")
+            if not param.hidden:
+                flags = []
+                for flag in param.get_short_flags() + param.get_long_flags():
+                    flags.append(f"[flag]{flag}[/flag]")
 
-            flags = ", ".join(flags)
-            nargs = self._format_metavar(param)
-            help = param.help
+                flags = ", ".join(flags)
+                nargs = self._format_metavar(param)
+                help = param.help or ""
 
-            default_help = param.default_help or param.default
-            
-            if default_help is not None:
-                help += f" [help_heading]Default:[/help_heading] [default_value]{default_help}[/default_value]."
+                default_help = param.default_help or param.default
+                
+                if default_help is not None:
+                    help += f" [help_heading]Default:[/help_heading] [default_value]{default_help}[/default_value]."
 
-            if param.required:
-                help += " [help_heading]Required.[/help_heading]"
+                if param.required:
+                    help += " [help_heading]Required.[/help_heading]"
 
-            grid.add_row(flags, nargs, help)
+                grid.add_row(flags, nargs, help)
 
         self.console.print("[heading]Optional arguments:[/heading]")
         self.console.print(Padding(grid, (0, 1)))
@@ -644,100 +700,232 @@ class ParseError(ValueError):
     pass
 
 
-def parse_args(arg_list, positional_params, optional_params, allow_intermixed_args=False):
+class UnknownOptionsFlag(ParseError):
+    pass
+
+
+def parse_args(arg_list, positional_params, optional_params):
 
     # A note on terminology: The arg list consists of 'tokens'. A token may be
     # either a 'flag' or a 'value'. A 'flag' indicates an option, and a 'value'
     # is simply a value that may be assigned to a parameter. 
 
-    # The first step simply extracts all optionals and positionals from the arg
-    # list. The positionals are extracted in chunks, where the boundaries of the
-    # chunks are determined by any encountered options. If
-    # 'allow_intermixed_args' is False, there may only be a single positionals
-    # chunk (i.e. the positional values may not be intermixed with options).
-    # Otherwise, all chunks are joined together.
+    # In the first step, the parser eats values from arg_list. All encountered
+    # options are parsed right away, but any positional values are saved for the
+    # next step.
+
+    # The next step tries to assign all extracted positional values to their
+    # corresponding parameters. There is an inherent ambiguity here when there
+    # are several positional parameters that can consume an arbitrary number of
+    # values. This ambiguity is resolved by letting each parameter in turn -
+    # from left to right - consume as many values as they can, under the
+    # constraint that the succeeding parameters can be assigned the minimal
+    # number of values they require. The semantics are the same as in argparse.
+
+    arg_list = list(arg_list) # Make mutable copy
+
+    parsed_optionals = []
+
+    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+
+    # Parse optionals
+    parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+
+    # Parse one chunk of positional values
+    positional_values, end_options_token_encountered = consume_positional_values(arg_list, max_num_positional_values, False)
+
+    if not end_options_token_encountered:
+        # Parse any remaining optionals
+        parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+    
+    # Any remaining values are unrecognized 
+    if len(arg_list) > 0:
+        parsing_error(arg_list, "Unrecognized value.")
+
+    if len(positional_params) > 0:
+        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+    else:
+        parsed_positionals = []
+
+    return parsed_positionals + parsed_optionals
+
+
+def parse_known_args(arg_list, positional_params, optional_params):
+    # This function stops parsing at the first unrecognized value, and returns
+    # the remainder of the arg_list together with the parsed params. It stops
+    # either when it encounters an unrecognized option or a positional value
+    # that it cannot consume due to already having consumed the maximum number
+    # of positional values.
+
+    arg_list = list(arg_list) # Make mutable copy
+
+    parsed_optionals = []
+
+    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+
+    try:
+        # Parse optionals
+        parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+
+        # Parse one chunk of positional values
+        positional_values, end_options_token_encountered = consume_positional_values(arg_list, max_num_positional_values, False)
+
+        if not end_options_token_encountered:
+            # Parse any remaining optionals
+            parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+    except UnknownOptionsFlag:
+        pass
+
+    if len(positional_params) > 0:
+        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+    else:
+        parsed_positionals = []
+
+    return parsed_positionals + parsed_optionals, arg_list
+
+
+def parse_intermixed_args(arg_list, positional_params, optional_params):
+    # This function allows intermixing positional args with options
 
     arg_list = list(arg_list) # Make mutable copy
 
     parsed_optionals = []
     positional_values = []
-    
+    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    end_options_token_encountered = False
+
     while len(arg_list) > 0:
-        token = arg_list[0]
+        if not end_options_token_encountered:
+            parsed_optionals.extend(consume_optionals(optional_params, arg_list))
 
-        if is_flag(token):
-            parsed_optionals.extend(parse_optional(optional_params, arg_list))
-        else:
-            if not allow_intermixed_args and len(positional_values) > 0:
-                # We have already extracted a chunk
-                parsing_error(arg_list, "Unrecognized value.")
-            
-            positional_values.extend(consume_positional_values(arg_list))
-   
-    # The next step tries to assign all extracted positional values to their
-    # corresponding parameters. There is an inherent ambiguity here when there
-    # are several positional parameters that can consume an arbitrary number of
-    # values. This ambiguity is resolved by letting the each parameter - from
-    # left to right - consume as many values as they can, under the constraint
-    # that the succeeding parameters can be assigned the minimal number of values
-    # they require. The semantics are the same as in argparse.
+        if len(positional_values) >= max_num_positional_values:
+            break
 
-    parsed_positionals = []
+        values, end_options_token_encountered = consume_positional_values(
+            arg_list, 
+            max_num_values_to_consume=max_num_positional_values - len(positional_values), 
+            end_options_token_encountered=end_options_token_encountered
+        )
+        positional_values.extend(values)
+        
+
+    # Any remaining values are unrecognized 
+    if len(arg_list) > 0:
+        parsing_error(arg_list, "Unrecognized value.")
 
     if len(positional_params) > 0:
-        num_assigned_values_per_param = {}
-        max_num_values_per_param = {}
-        for param in positional_params:
-            if param.nargs == OPTIONAL:
-                num_assigned_values_per_param[param] = 0
-                max_num_values_per_param[param] = 1
-            elif param.nargs == ZERO_OR_MORE:
-                num_assigned_values_per_param[param] = 0
-                max_num_values_per_param[param] = float("inf")
-            elif param.nargs == ONE_OR_MORE:
-                num_assigned_values_per_param[param] = 1
-                max_num_values_per_param[param] = float("inf")
-            else:
-                num_assigned_values_per_param[param] = param.nargs or 1
-                max_num_values_per_param[param] = param.nargs or 1
-
-        if sum(num_assigned_values_per_param.values()) > len(positional_values):
-            s = ""
-            if sum(num_assigned_values_per_param.values()) < sum(max_num_values_per_param.values()):
-                s = "at least " 
-
-            parsing_error([], f"Too few positional args, expected {s}{sum(num_assigned_values_per_param.values())}, "
-                               "got {len(positional_values)}.")
-        
-        curr_param_index = 0
-            
-        while sum(num_assigned_values_per_param.values()) < len(positional_values) and curr_param_index < len(positional_params):
-            param = positional_params[curr_param_index]
-            if num_assigned_values_per_param[param] < max_num_values_per_param[param]:
-                num_assigned_values_per_param[param] += 1
-            else:
-                curr_param_index += 1
-            
-        if sum(num_assigned_values_per_param.values()) < len(positional_values):
-            parsing_error([], f"Too many positional values, expected {sum(num_assigned_values_per_param.values())}, "
-                               "got {len(positional_values)}.")
-
-        
-        value_indices = list(itertools.accumulate(num_assigned_values_per_param.values()))
-        value_indices.insert(0, 0)
-
-        for i, param in enumerate(positional_params):
-            parsed_positionals.append(ParseResult(param, None, positional_values[value_indices[i]:value_indices[i+1]]))
-
-    elif len(positional_values) > 0:
-        parsing_error([], "Unrecognized arguments.")
+        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+    else:
+        parsed_positionals = []
 
     return parsed_positionals + parsed_optionals
+
+
+def parse_known_intermixed_args(arg_list, positional_params, optional_params):
+    # This function allows intermixing positional args with options
+
+    arg_list = list(arg_list) # Make mutable copy
+
+    parsed_optionals = []
+    positional_values = []
+    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    end_options_token_encountered = False
+
+    try:
+        while len(arg_list) > 0:
+            if not end_options_token_encountered:
+                parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+            
+            if len(positional_values) >= max_num_positional_values:
+                break
+
+            values, end_options_token_encountered = consume_positional_values(
+                arg_list, 
+                max_num_values_to_consume=max_num_positional_values - len(positional_values), 
+                end_options_token_encountered=end_options_token_encountered
+            )
+            positional_values.extend(values)
+    except UnknownOptionsFlag:
+        pass
+
+    if len(positional_params) > 0:
+        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+    else:
+        parsed_positionals = []
+
+    return parsed_positionals + parsed_optionals, arg_list
+
+
+def parse_shared_args(arg_list, positional_params, optional_params):
+    # This function is intended to be used when there are subcommands present.
+    # It parses a set of options and a chunk of positonal values, and leaves the
+    # remainder for subcommands
+
+    arg_list = list(arg_list) # Make mutable copy
+
+    parsed_optionals = []
+
+    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+
+    # Parse optionals
+    parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+
+    # Parse one chunk of positional values
+    positional_values, end_options_token_encountered = consume_positional_values(arg_list, max_num_positional_values, False)
+
+    if len(positional_params) > 0:
+        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+    else:
+        parsed_positionals = []
+
+    return parsed_positionals + parsed_optionals, arg_list
+
+
+def consume_optionals(optional_params, arg_list):
+    parsed_optionals = []
+
+    while len(arg_list) > 0 and is_flag(arg_list[0]):
+        parsed_optionals.extend(parse_optional(optional_params, arg_list))
+
+    return parsed_optionals
+
+
+def consume_positional_values(arg_list, max_num_values_to_consume, end_options_token_encountered):
+    positional_values = []
+    
+    while (
+        len(arg_list) > 0 and 
+        len(positional_values) < max_num_values_to_consume and 
+        (not is_flag(arg_list[0]) or end_options_token_encountered)
+    ):
+        if not end_options_token_encountered and arg_list[0] == "--":
+            end_options_token_encountered = True
+            arg_list.pop(0)
+        else:
+            positional_values.append(arg_list.pop(0))
+
+    return positional_values, end_options_token_encountered
 
 
 def parsing_error(arg_list, msg):
     # TODO: use arg list in error reporting
     raise ParseError(msg)
+
+
+def calculate_maximum_allowed_number_of_positional_values(positional_params):
+    max_num_values = 0
+
+    for param in positional_params:
+        if param.nargs == OPTIONAL:
+            max_num_values += 1
+        elif param.nargs == ZERO_OR_MORE:
+            max_num_values += float("inf")
+        elif param.nargs == ONE_OR_MORE:
+            max_num_values += float("inf")
+        else:
+            max_num_values += param.nargs or 1
+    
+    return max_num_values
 
 
 def is_flag(token):
@@ -755,10 +943,9 @@ def parse_optional(optional_params, arg_list):
             if param.flags is not None and flag in param.flags:
                 return param
         
-        parsing_error(arg_list, "Unrecognized option.")
+        raise UnknownOptionsFlag(f"Unrecognized option '{flag}'.")
 
-    # Postpone popping the flag until we are sure it will not be needed 
-    # in reporting some possible error
+    # Postpone popping the flag until we are sure we can consume it
 
     if "=" in arg_list[0]:
         flag, value = arg_list[0].split("=", 1)
@@ -771,7 +958,7 @@ def parse_optional(optional_params, arg_list):
 
     # Flags can be either long or short (e.g. -l, --long)
 
-    if re.match(r"^--", flag):
+    if re.match(r"^--", flag): # Handle long flags
         param = get_param_for_flag(flag)
         arg_list.pop(0)
 
@@ -779,12 +966,11 @@ def parse_optional(optional_params, arg_list):
 
         parsed_options.append(ParseResult(param, flag, values))
 
-    elif re.match(r"^-[^-]", flag):
+    elif re.match(r"^-[^-]", flag): # Handle short flags
         # Shorthand flags may be joined together 
         # (e.g: 'ls -la' is equal to 'ls -l -a')
         
-        if len(flag) == 2:
-            # A single flag
+        if len(flag) == 2: # We have a single shorthand flag
             param = get_param_for_flag(flag)
             arg_list.pop(0)
 
@@ -792,13 +978,13 @@ def parse_optional(optional_params, arg_list):
 
             parsed_options.append(ParseResult(param, flag, values))
 
-        else:
+        else: # We have muliple shorthand flags
             # None of the combined flags may consume any values. 
             # TODO: Maybe change in future...
 
             if len(values) > 0:
                 parsing_error(arg_list, "Unexpected value encountered. Combined shorthand "
-                                        "options can not be assigned values")
+                                        "options can not be assigned values.")
 
             all_flags = [f"-{char}" for char in flag[1:]]
 
@@ -809,7 +995,7 @@ def parse_optional(optional_params, arg_list):
             arg_list.pop(0)
 
     else:
-        parsing_error(arg_list, "Invalid flag encountered. This should never happend.")
+        parsing_error(arg_list, "Invalid flag encountered. This should never happen.")
 
     return parsed_options
 
@@ -835,18 +1021,110 @@ def consume_optional_values(arg_list, nargs, num_already_consumed_values=0):
     return consumed_values
 
 
-def consume_positional_values(arg_list):
-    consumed_values = []
+def assign_values_to_positionals(positional_params, positional_values):
+    parsed_positionals = []
 
-    while len(arg_list) > 0:
-        if arg_list[0] == "--":
-            # Everything after the first '--' are positional values.
-            # The '--' token does not split positional values into chunks
-            consumed_values += arg_list[1:]
-            arg_list[:] = [] 
-        elif is_value(arg_list[0]):
-            consumed_values.append(arg_list.pop(0))
+    num_assigned_values_per_param = collections.defaultdict(lambda: 0)
+    # Begin with assigning the minimum number of values required for each param,
+    # from left to right.
+    
+    def get_num_assigned_values():
+        return sum(num_assigned_values_per_param.values())
+
+    curr_param_index = 0
+    
+    while get_num_assigned_values() < len(positional_values) and curr_param_index < len(positional_values):
+        param = positional_params[curr_param_index]
+
+        if param.nargs == OPTIONAL:
+            num_assigned_values_per_param[param] = 0
+            curr_param_index += 1
+        elif param.nargs == ZERO_OR_MORE:
+            num_assigned_values_per_param[param] = 0
+            curr_param_index += 1
+        elif param.nargs == ONE_OR_MORE:
+            num_assigned_values_per_param[param] = 1
+            curr_param_index += 1
         else:
-            break
+            min_nargs = param.nargs or 1
+            if num_assigned_values_per_param[param] < min_nargs:
+                num_assigned_values_per_param[param] += 1
+            else:
+                curr_param_index += 1
 
-    return consumed_values
+    while get_num_assigned_values() < len(positional_values) and curr_param_index < len(positional_params):
+        param = positional_params[curr_param_index]
+
+        if param.nargs == OPTIONAL:
+            if num_assigned_values_per_param[param] < 1:
+                num_assigned_values_per_param[param] = 1
+
+            curr_param_index += 1  
+        elif param.nargs == ZERO_OR_MORE:
+            num_assigned_values_per_param[param] += 1
+        elif param.nargs == ONE_OR_MORE:
+            num_assigned_values_per_param[param] += 1
+        else:
+            # all params with a specific number of values have already been
+            # filled in the previous step
+            curr_param_index += 1
+    
+    assert get_num_assigned_values() == len(positional_values), "Internal error, too many positional values passed to 'assign_values_to_positionals'."
+
+    value_indices = list(itertools.accumulate(num_assigned_values_per_param.values()))
+    value_indices.insert(0, 0)
+
+    for i, param in enumerate(positional_params):
+        parsed_positionals.append(ParseResult(param, None, positional_values[value_indices[min(i, len(value_indices)-1)]:value_indices[min(i+1, len(value_indices)-1)]]))
+
+    return parsed_positionals
+
+def assign_values_to_positionals_old(positional_params, positional_values):
+    parsed_positionals = []
+
+    num_assigned_values_per_param = {}
+    max_num_values_per_param = {}
+
+    for param in positional_params:
+        if param.nargs == OPTIONAL:
+            num_assigned_values_per_param[param] = 0
+            max_num_values_per_param[param] = 1
+        elif param.nargs == ZERO_OR_MORE:
+            num_assigned_values_per_param[param] = 0
+            max_num_values_per_param[param] = float("inf")
+        elif param.nargs == ONE_OR_MORE:
+            num_assigned_values_per_param[param] = 1
+            max_num_values_per_param[param] = float("inf")
+        else:
+            num_assigned_values_per_param[param] = param.nargs or 1
+            max_num_values_per_param[param] = param.nargs or 1
+
+    if sum(num_assigned_values_per_param.values()) > len(positional_values):
+        s = ""
+        if sum(num_assigned_values_per_param.values()) < sum(max_num_values_per_param.values()):
+            s = "at least " 
+
+        parsing_error([], f"Too few positional args, expected {s}{sum(num_assigned_values_per_param.values())}, "
+                            f"got {len(positional_values)}.")
+    
+    curr_param_index = 0
+        
+    while sum(num_assigned_values_per_param.values()) < len(positional_values) and curr_param_index < len(positional_params):
+        param = positional_params[curr_param_index]
+        if num_assigned_values_per_param[param] < max_num_values_per_param[param]:
+            num_assigned_values_per_param[param] += 1
+        else:
+            curr_param_index += 1
+        
+    # if sum(num_assigned_values_per_param.values()) < len(positional_values):
+    #     parsing_error([], f"Too many positional values, expected {sum(num_assigned_values_per_param.values())}, "
+    #                         f"got {len(positional_values)}.")
+
+    
+    value_indices = list(itertools.accumulate(num_assigned_values_per_param.values()))
+    value_indices.insert(0, 0)
+
+    for i, param in enumerate(positional_params):
+        parsed_positionals.append(ParseResult(param, None, positional_values[value_indices[i]:value_indices[i+1]]))
+
+    return parsed_positionals

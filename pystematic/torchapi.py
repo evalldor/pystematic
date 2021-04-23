@@ -16,8 +16,9 @@ import yaml
 import tqdm
 
 from .recording import Recorder
-from .click_adapter import invoke_experiment_with_parsed_args, get_current_experiment
+from .core import get_current_experiment
 from . import utils
+from .yaml_stuff import YamlDumper
 
 
 logger = logging.getLogger('pystematic_torch')
@@ -87,8 +88,8 @@ def run_experiment(experiment, **params) -> multiprocessing.Process:
     logger.debug(f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
 
     proc = multiprocessing.get_context('spawn').Process(
-        target=invoke_experiment_with_parsed_args,
-        args=(experiment, params)
+        target=experiment.run,
+        args=(params, )
     )
 
     proc.start()
@@ -127,8 +128,8 @@ def launch_subprocess(**additional_params) -> multiprocessing.Process:
     logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
 
     proc = multiprocessing.Process(
-        target=invoke_experiment_with_parsed_args,
-        args=(get_current_experiment(), subprocess_params)
+        target=get_current_experiment().run,
+        args=(subprocess_params,)
     )
     proc.start()
 
@@ -423,27 +424,27 @@ def _initialize(_params):
     """This is an internal function used to initialize the api object when a
     new experiment is started"""
 
-    if _params["debug"]:
+    params.__wrapped__ = _params
+    
+    if params["debug"]:
         log_level = "DEBUG"
     else:
         log_level = "INFO"
 
     logging.basicConfig(level=log_level, handlers=[utils.PytorchLogHandler()])
 
-    params.__wrapped__ = _params
-
     if params["subprocess"]:
         logger.debug(f"Initializing subprocess...")
         output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
         params_file.__wrapped__ = pathlib.Path(params["subprocess"])
     else:
-        output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], get_current_experiment().experiment_name)
+        output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], get_current_experiment().name)
         output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
         params_file.__wrapped__ = output_dir.joinpath("parameters.yml")
 
         logger.debug(f"Writing parameters file to '{params_file}'.")
         with params_file.open("w") as f:
-            yaml.dump(_params, f, default_flow_style=False)
+            yaml.dump(_params, f, default_flow_style=False, Dumper=YamlDumper)
 
     random_gen.__wrapped__ = random.Random(params["random_seed"])
 
@@ -493,7 +494,7 @@ def _load_state_dict_into_item(item, state_dict):
         return state_dict["native_value"]
         
     else:
-        logger.debug(f"Cannot checkpoint object of type '{type(item)}'")
+        logger.debug(f"Cannot checkpoint object of type '{type(item)}'.")
 
     return item
 

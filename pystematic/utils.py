@@ -7,8 +7,6 @@ import multiprocessing
 import torch
 import click
 
-from .click_adapter import invoke_experiment_with_parsed_args, get_current_experiment
-
 logger = logging.getLogger('pystematic_torch')
 
 class PytorchLogHandler(logging.Handler):
@@ -82,8 +80,8 @@ class ProcessQueue:
 
                 with envvars({"CUDA_VISIBLE_DEVICES": ",".join([str(id) for id in gpus])}):
                     proc = self._mp_context.Process(
-                        target=invoke_experiment_with_parsed_args,
-                        args=(experiment, params)
+                        target=experiment.run,
+                        args=(params, )
                     )
 
                     proc.gpus = gpus
@@ -92,8 +90,8 @@ class ProcessQueue:
                     self._live_processes.append(proc)
             else:
                 proc = self._mp_context.Process(
-                    target=invoke_experiment_with_parsed_args,
-                    args=(experiment, params)
+                    target=experiment.run,
+                    args=(params, )
                 )
 
                 proc.start()
