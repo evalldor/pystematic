@@ -18,7 +18,7 @@ import tqdm
 from .recording import Recorder
 from .core import get_current_experiment
 from . import utils
-from .yaml_stuff import YamlDumper
+from . import yaml_wrapper as yaml
 
 
 logger = logging.getLogger('pystematic_torch')
@@ -444,7 +444,7 @@ def _initialize(_params):
 
         logger.debug(f"Writing parameters file to '{params_file}'.")
         with params_file.open("w") as f:
-            yaml.dump(_params, f, default_flow_style=False, Dumper=YamlDumper)
+            yaml.dump(_params, f)
 
     random_gen.__wrapped__ = random.Random(params["random_seed"])
 

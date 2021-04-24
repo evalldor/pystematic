@@ -1,9 +1,11 @@
-import pathlib
 import yaml
+
 from yaml.representer import SafeRepresenter
 from yaml.emitter import Emitter
 from yaml.serializer import Serializer
 from yaml.resolver import Resolver
+
+
 
 class YamlRepresenter(SafeRepresenter):
 
@@ -29,3 +31,11 @@ class YamlDumper(Emitter, Serializer, YamlRepresenter, Resolver):
         YamlRepresenter.__init__(self, default_style=default_style,
                 default_flow_style=default_flow_style, sort_keys=sort_keys)
         Resolver.__init__(self)
+
+
+
+def load(f):
+    return yaml.load(f, Loader=yaml.Loader)
+
+def dump(obj, f):
+    return yaml.dump(obj, f, default_flow_style=False, Dumper=YamlDumper)

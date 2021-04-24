@@ -6,7 +6,6 @@ authors = ["Erik Valldor <erik.valldor@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-click = "^7.1.2"
 tqdm = "^4.48.2"
 tensorboardX = "^2.1"
 numpy = "^1.19.1"

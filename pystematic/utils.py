@@ -5,34 +5,45 @@ import time
 import multiprocessing
 
 import torch
-import click
+
+from rich.console import Console
+from rich.theme import Theme
+from rich.markup import escape
 
 logger = logging.getLogger('pystematic_torch')
 
 class PytorchLogHandler(logging.Handler):
     """Handle logging for both single- and multiprocess contexts."""
 
-    def __init__(self):
+    def __init__(self, no_style=False):
         super().__init__()
-        self._colors = {
-            'DEBUG':    'magenta',
-            'INFO':     'blue',
-            'WARNING':  'yellow',
-            'ERROR':    'red'
-        }
+        theme = Theme({
+            'debug':    'magenta',
+            'info':     'blue',
+            'warning':  'yellow',
+            'error':    'red',
+            'rank': "green",
+            'name': "green"
+
+        }, inherit=False)
+
+        if no_style:
+            theme = Theme({}, inherit=False)
+
+        self.console = Console(theme=theme)
 
     def handle(self, record):
-        level = click.style(f"[{record.levelname}]",
-                            fg=self._colors[record.levelname])
-        msg = click.style(f"{record.getMessage()}", fg="white")
+        level_str = escape(f"[{record.levelname}]")
+        level = f"[{record.levelname.lower()}]{level_str}[/{record.levelname.lower()}]"
+        msg = f"{record.getMessage()}"
 
-        name = click.style(f"[{record.name}]", fg="green")
+        name = f"[name]\[{record.name}][/name]"
 
         if torch.distributed.is_initialized():
-            rank = click.style(f"[RANK {torch.distributed.get_rank()}]", fg="green")
-            click.echo(f"{level} {rank} {name} {msg}")
+            rank = f"[rank][RANK {torch.distributed.get_rank()}][/rank]"
+            self.console.print(f"{level} {rank} {name} {msg}")
         else:
-            click.echo(f"{level} {name} {msg}")
+            self.console.print(f"{level} {name} {msg}")
 
 
 @contextlib.contextmanager

@@ -4,7 +4,7 @@ reproducible experiments in pytorch.*
 TODO
 ====
 
-- !!python/tuple
+- Parameter groups
 - make context manually created. 
 - Make checkpoint loading manual. Add global property checkpoint
 - Main function should only take params as argument
@@ -13,19 +13,9 @@ TODO
 
 CLI
 ---
-- Builds on Click
 - Define experiment.
-- Define args.
-- global_entrypoint
+- Define params.
 - running experiments
-
-
-Context
--------
-- Holds all state related to experiment
-- Configuration/params
-- Default params
-- Examples in script
 
 
 
@@ -36,18 +26,10 @@ Reproducibility
 - pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
 
 
-
-Training
---------
-- Looper (optional)
-
-
 Recording
 ---------
 - wrapped because of transparency for distributed training
 - Backends
-- adding and commiting.
-- gobal_step required (= x-axis in all data charts)
 
 Counters
 --------
@@ -60,7 +42,3 @@ Distributed training
 - context helper methods
 - idendical random seeds
 
-
-
-
-All experiments are registered with pystematic.global_entrypoint

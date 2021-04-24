@@ -43,7 +43,7 @@ class ChoiceType:
                 if str(allowed_value).lower() == str(value).lower():
                     return allowed_value
 
-        raise ValueError(f"Expected a value in '{self.allowed_values}', got '{str(value)}'.")
+        raise ValueError(f"Expected a value in {self.allowed_values}, got '{str(value)}'.")
 
 
 class BooleanType:
@@ -324,10 +324,17 @@ class ParamValueDict(collections.UserDict):
             self[name] = value
 
     def set_value(self, param, value):
-        param.set_value(value, self)
+        try:
+            param.set_value(value, self)
+        except Exception as e:
+            raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
 
     def set_cli_value(self, param, flag, value):
-        param.set_cli_value(flag, value, self)
+        try:
+            param.set_cli_value(flag, value, self)
+        except Exception as e:
+            raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
+        
 
 
 @dataclasses.dataclass
@@ -363,9 +370,6 @@ class ParameterManager:
         env_prefix=None, 
         env_value_separators=":,",
         cli_help_formatter=None,
-        cli_allow_intermixed_args=False,
-        cli_require_options_before_positionals=False,
-        cli_consume_known_params_only=False,
         add_cli_help_option=True,
     ) -> None:
 
@@ -377,8 +381,6 @@ class ParameterManager:
         self.env_value_separators = env_value_separators
 
         self.cli_help_formatter = cli_help_formatter or CliHelpFormatter()
-        
-        self.cli_allow_intermixed_args = cli_allow_intermixed_args
 
         if add_cli_help_option:
             self.add_param(
@@ -1052,6 +1054,9 @@ def assign_values_to_positionals(positional_params, positional_values):
             else:
                 curr_param_index += 1
 
+    # If there are any values left, we assign them to the variable length
+    # parameters from left to right
+
     while get_num_assigned_values() < len(positional_values) and curr_param_index < len(positional_params):
         param = positional_params[curr_param_index]
 
@@ -1075,56 +1080,10 @@ def assign_values_to_positionals(positional_params, positional_values):
     value_indices.insert(0, 0)
 
     for i, param in enumerate(positional_params):
-        parsed_positionals.append(ParseResult(param, None, positional_values[value_indices[min(i, len(value_indices)-1)]:value_indices[min(i+1, len(value_indices)-1)]]))
-
-    return parsed_positionals
-
-def assign_values_to_positionals_old(positional_params, positional_values):
-    parsed_positionals = []
-
-    num_assigned_values_per_param = {}
-    max_num_values_per_param = {}
-
-    for param in positional_params:
-        if param.nargs == OPTIONAL:
-            num_assigned_values_per_param[param] = 0
-            max_num_values_per_param[param] = 1
-        elif param.nargs == ZERO_OR_MORE:
-            num_assigned_values_per_param[param] = 0
-            max_num_values_per_param[param] = float("inf")
-        elif param.nargs == ONE_OR_MORE:
-            num_assigned_values_per_param[param] = 1
-            max_num_values_per_param[param] = float("inf")
-        else:
-            num_assigned_values_per_param[param] = param.nargs or 1
-            max_num_values_per_param[param] = param.nargs or 1
-
-    if sum(num_assigned_values_per_param.values()) > len(positional_values):
-        s = ""
-        if sum(num_assigned_values_per_param.values()) < sum(max_num_values_per_param.values()):
-            s = "at least " 
-
-        parsing_error([], f"Too few positional args, expected {s}{sum(num_assigned_values_per_param.values())}, "
-                            f"got {len(positional_values)}.")
-    
-    curr_param_index = 0
-        
-    while sum(num_assigned_values_per_param.values()) < len(positional_values) and curr_param_index < len(positional_params):
-        param = positional_params[curr_param_index]
-        if num_assigned_values_per_param[param] < max_num_values_per_param[param]:
-            num_assigned_values_per_param[param] += 1
-        else:
-            curr_param_index += 1
-        
-    # if sum(num_assigned_values_per_param.values()) < len(positional_values):
-    #     parsing_error([], f"Too many positional values, expected {sum(num_assigned_values_per_param.values())}, "
-    #                         f"got {len(positional_values)}.")
-
-    
-    value_indices = list(itertools.accumulate(num_assigned_values_per_param.values()))
-    value_indices.insert(0, 0)
-
-    for i, param in enumerate(positional_params):
-        parsed_positionals.append(ParseResult(param, None, positional_values[value_indices[i]:value_indices[i+1]]))
+        parsed_positionals.append(ParseResult(
+            param, 
+            None, 
+            positional_values[value_indices[min(i, len(value_indices)-1)]:value_indices[min(i+1, len(value_indices)-1)]]
+        ))
 
     return parsed_positionals

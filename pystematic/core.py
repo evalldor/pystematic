@@ -4,9 +4,8 @@ import pathlib
 import inspect
 import random
 import functools
-import time
 
-import yaml
+from . import yaml_wrapper as yaml
 
 from . import parametric
 
@@ -201,7 +200,7 @@ class Experiment:
         self._run_experiment(param_values)
     
     def _run_experiment(self, params):
-
+        
         from . import torchapi
         global _current_experiment
         _current_experiment = self
@@ -224,6 +223,7 @@ class ExperimentGroup:
         self.param_manager.add_param(
             name="experiment",
             help="The name of the experiment to run.",
+            required=True,
             cli_positional=True
         )
 
@@ -238,7 +238,6 @@ class ExperimentGroup:
         if argv is None:
             argv = sys.argv[1:]
 
-        
         param_values, argv_rest = self.param_manager.from_shared_cli(argv)
         
         experiments = {exp.name: exp for exp in self.experiments}
@@ -273,7 +272,7 @@ class ParamsFileBehaviour(parametric.DefaultParameterBehaviour):
                     blacklisted_config_ops.append(param.name)
             
             with value.open("r") as f:
-                params_from_file = yaml.load(f, Loader=yaml.Loader)
+                params_from_file = yaml.load(f)
             
             for key, value in params_from_file.items():
                 if key not in blacklisted_config_ops:
