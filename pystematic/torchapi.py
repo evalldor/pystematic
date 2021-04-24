@@ -87,14 +87,7 @@ def run_experiment(experiment, **params) -> multiprocessing.Process:
 
     logger.debug(f"Running experiment '{experiment.experiment_name}' with arguments {params}.")
 
-    proc = multiprocessing.get_context('spawn').Process(
-        target=experiment.run,
-        args=(params, )
-    )
-
-    proc.start()
-
-    return proc
+    return experiment.run_in_new_process(params)
 
 
 def launch_subprocess(**additional_params) -> multiprocessing.Process:
@@ -116,8 +109,6 @@ def launch_subprocess(**additional_params) -> multiprocessing.Process:
         >>> pystematic.launch_subprocess(random_seed=pystematic.new_seed())
 
     """
-    logger.debug("Launching subprocess...")
-
     subprocess_params = {name: value for name, value in params.items()}
 
     for name, value in additional_params.items():
@@ -127,13 +118,7 @@ def launch_subprocess(**additional_params) -> multiprocessing.Process:
 
     logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
 
-    proc = multiprocessing.Process(
-        target=get_current_experiment().run,
-        args=(subprocess_params,)
-    )
-    proc.start()
-
-    return proc
+    return get_current_experiment().run_in_new_process(subprocess_params)
 
 
 def is_subprocess() -> bool:

@@ -48,7 +48,6 @@ def test_params_are_added():
         exp.run({"test_param": "test", "int_param": 3})
 
 
-
 def test_experiment_group():
 
     class Exp1Ran(Exception):
@@ -74,7 +73,7 @@ def test_experiment_group():
     exp_one = core.Experiment(exp1)
     exp_two = core.Experiment(exp2)
 
-    group = core.ExperimentGroup()
+    group = core.ExperimentGroup(lambda x:x)
     group.add_experiment(exp_one)
     group.add_experiment(exp_two)
 

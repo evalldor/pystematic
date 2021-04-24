@@ -90,22 +90,11 @@ class ProcessQueue:
                 gpus = self._gpu_resource.allocate(self._num_gpus_per_process)
 
                 with envvars({"CUDA_VISIBLE_DEVICES": ",".join([str(id) for id in gpus])}):
-                    proc = self._mp_context.Process(
-                        target=experiment.run,
-                        args=(params, )
-                    )
-
+                    proc = experiment.run_in_new_process(params)
                     proc.gpus = gpus
-
-                    proc.start()
                     self._live_processes.append(proc)
             else:
-                proc = self._mp_context.Process(
-                    target=experiment.run,
-                    args=(params, )
-                )
-
-                proc.start()
+                proc = experiment.run_in_new_process(params)
                 self._live_processes.append(proc)
 
         while len(self._live_processes) > 0:

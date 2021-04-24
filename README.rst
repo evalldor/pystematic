@@ -7,7 +7,6 @@ TODO
 - Parameter groups
 - make context manually created. 
 - Make checkpoint loading manual. Add global property checkpoint
-- Main function should only take params as argument
 - Make proper experiment decorator
 - Make clearer separation between pytorch specifics and general stuff
 
@@ -22,7 +21,7 @@ CLI
 Reproducibility
 ---------------
 - "One seed to rule them all"
-- random seed, seeding you random number generators
+- random seed, seeding your random number generators
 - pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
 
 
@@ -40,5 +39,5 @@ Distributed training
 - Launching
 - default args
 - context helper methods
-- idendical random seeds
+- identical random seeds
 

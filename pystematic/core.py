@@ -4,7 +4,9 @@ import pathlib
 import inspect
 import random
 import functools
-
+import multiprocessing
+import importlib
+import uuid
 from . import yaml_wrapper as yaml
 
 from . import parametric
@@ -198,6 +200,18 @@ class Experiment:
 
         param_values = self.param_manager.from_cli(argv)
         self._run_experiment(param_values)
+
+    def run_in_new_process(self, params):
+        # We run the experiment like this to avoid pickling problems
+        module = self.main_function.__module__
+        name = self.main_function.__name__
+        proc = multiprocessing.get_context('spawn').Process(
+            target=_run_experiment_by_name,
+            args=(module, name, params)
+        )
+        proc.start()
+
+        return proc
     
     def _run_experiment(self, params):
         
@@ -206,6 +220,12 @@ class Experiment:
         _current_experiment = self
         torchapi._initialize(params)
         self.main_function(params)
+
+
+def _run_experiment_by_name(experiment_module, experiment_name, params):
+    # used by Experiment.run_in_new_process
+    module = importlib.import_module(experiment_module)
+    getattr(module, experiment_name).run(params)
 
 
 class ExperimentGroup:
@@ -308,7 +328,7 @@ general_params = [
         default=functools.partial(random.getrandbits, 32),
         help="The value to seed random number generators with.",
         type=int, 
-        default_help="randomly generated",
+        default_help="<randomly generated>",
         behaviour=PystematicParameterBehaviour()
     ),
     parametric.Parameter(
@@ -413,7 +433,6 @@ pytorch_params = [
         behaviour=PystematicParameterBehaviour()
     )
 ]
-
 
 _current_experiment = None
 def get_current_experiment():
