@@ -54,7 +54,7 @@ Or you can run the experiment from the command line:
 
 Full documentation is available at ???.
 
-Note that this project is still in the early stages, and there may be some rough
+Note that this project is still in the early stages. There may be some rough
 edges.
 
 
