@@ -1,5 +1,62 @@
-*A collection of tools that helps you to systematically setup and run
-reproducible experiments in pytorch.*
+Pystematic is a framework that helps you to systematically setup and run
+reproducible experiments in python. The main concept revolves around defining
+experiments together with a set of parameters.
+
+For example, the following code defines an experiment named ``example`` with two
+parameters, ``string_param`` and ``int_param``:
+
+.. code-block:: 
+
+    import pystematic.classic as ps
+    
+    @ps.parameter(
+        name="string_param",
+        type=str,
+        help="A string parameter"
+    )
+    @ps.parameter(
+        name="int_param",
+        type=int,
+        help="An int parameter",
+        default=0
+    )
+    @ps.experiment
+    def example(params):
+        print("Hello from example experiment.")
+        print("string_param is {params['string_param']} and int_param is {params['int_param']}.")
+
+
+You can run the experiment by either supplying a dict containing the values for
+the parameters:
+
+.. code-block:: 
+
+    if __name__ == "__main__":
+        example.run({
+        
+        })
+
+.. code-block:: 
+
+    $ python path/to/file.py
+
+
+Or you can run the experiment from the command line:
+
+.. code-block:: 
+
+    if __name__ == "__main__":
+        example.cli()
+
+.. code-block:: 
+
+    $ python path/to/file.py --string-param hello --int-param 10
+
+Full documentation is available at ???.
+
+Note that this project is still in the early stages, and there may be some rough
+edges.
+
 
 TODO
 ====
