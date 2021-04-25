@@ -1,20 +1,20 @@
 import time
 import random
-import pystematic
+import pystematic.classic as ps
 
 
 
-@pystematic.experiment
+@ps.experiment
 def main_experiment(params):
     print("NEW")
     time.sleep(random.uniform(0, 10))
     print("END")
 
 
-@pystematic.experiment
+@ps.experiment
 def param_search(params):
     
-    pystematic.run_parameter_sweep(main_experiment, [{}]*50, max_num_processes=10)
+    ps.run_parameter_sweep(main_experiment, [{}]*50, max_num_processes=10)
 
 if __name__ == "__main__":
-    pystematic.global_entrypoint()
+    param_search.cli()

@@ -5,8 +5,6 @@ TODO
 ====
 
 - Parameter groups
-- make context manually created. 
-- Make checkpoint loading manual. Add global property checkpoint
 - Make proper experiment decorator
 - Make clearer separation between pytorch specifics and general stuff
 

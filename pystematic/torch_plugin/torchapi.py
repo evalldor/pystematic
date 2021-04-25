@@ -42,8 +42,6 @@ random_gen: random.Random = wrapt.ObjectProxy(None)
 """Holds the global random generator used to generate new seeds"""
 
 
-context = wrapt.ObjectProxy(None)
-
 
 def new_seed(nbits=32) -> int:
     """Use this function to generate random numbers seeded by the experiment
@@ -176,7 +174,7 @@ def init_distributed() -> None:
     world_size = params["nproc_per_node"] * params["nnodes"]
 
     logger.debug(f"Initializing distributed runtime (world size '{world_size}', "
-                  "local rank '{local_rank}', global rank '{global_rank}')...")
+                 f"local rank '{local_rank}', global rank '{global_rank}')...")
 
     torch.cuda.set_device(local_rank)
 
@@ -230,7 +228,7 @@ def distributed_barrier() -> None:
 # Checkpoints
 #
 
-def save_checkpoint(filename) -> None:
+def save_checkpoint(ctx, filename) -> None:
     """Saves registered items to a file. All items that have a function named
     ``state_dict`` will be saved by calling that function and saving the
     returned value. This function will make sure to only save the checkpoint in
@@ -243,7 +241,7 @@ def save_checkpoint(filename) -> None:
         logger.info(f"Saving checkpoint '{checkpoint_file_path}'.")
 
         with checkpoint_file_path.open("wb") as f:
-            torch.save(context.state_dict(), f)
+            torch.save(ctx.state_dict(), f)
 
 
 def load_checkpoint(checkpoint_file_path) -> dict:
@@ -256,151 +254,7 @@ def load_checkpoint(checkpoint_file_path) -> dict:
 # Context
 #
 
-@dataclasses.dataclass
-class ContextItem:
-    """Represents an item registered with a pytorch context. It is just a
-    wrapper around an object together with some configuration items."""
-
-    handle: typing.Any  # A handle to the actual item / object
-
-    cuda: bool = True  # Can be used to disable cuda movement for specific items
     
-    checkpoint: bool = True # Set to False to exclude this item from being saved and loaded from checkpoints
-
-
-class TorchContext:
-    """A context object is like a big container that holds all pytorch related
-    objects you need. Its main use is to allow a pytorch session so transition
-    seamlessly between different modes (e.g. distributed, cuda) based on
-    experiment parameters. It does this by transparently transforming some
-    object that you add. For example, when running in distributed mode, all
-    pytorch models added to this context will be automatically wrapped in 
-    torch's :obj:`DistributedDataParallel`.
-
-    The methods :meth:`state_dict` and :meth:`load_state_dict` provides a single
-    point of entry to the state of the entire session (provided that all objects
-    are registered with it).
-
-    A context object makes use of the following parameters to determine how
-    objects should be handled:
-
-    - cuda
-    - distributed
-
-    """
-
-    def __init__(self):
-        object.__setattr__(self, "_items", {})
-        object.__setattr__(self, "_checkpoint", {})
-
-    def __getattr__(self, name):
-        if name in self._items:
-            return self._items[name].handle
-
-        raise AttributeError(f"TorchContext does not have an attribute named '{name}'.")
-
-    def __setattr__(self, name, value):
-        self.add(name, value)
-
-    def has(self, name : str):
-        return name in self._items
-
-    def add(self, name : str, item : typing.Any, cuda=True, checkpoint=True):
-        """Adds item :obj:`item` to the context with name :obj:`name`. You
-        normally don't call this method manually. It is automatically called
-        whenever you add an attribute to this object.
-
-        For example::
-
-            ctx = pystematic.TorchContext()
-            ctx.model = SomeTorchModel() # This would be the same as ctx.add("model", SomeTorchModel())
-
-        Args:
-            name (str): The name that the item will be accessible under
-            item (any): The item to add
-            cuda (bool, optional): Whether the item should be automatically 
-                moved to cuda when added. Defaults to True.
-            checkpoint (bool, optional): Controls whether the item should be 
-                saved and read to/from checkpoints. Defaults to True.
-
-        """
-        if not name.isidentifier():
-            raise ValueError(f"'{name}' is not a valid python identifier.")
-
-        if name in dir(self):
-            raise ValueError(f"'{name}' is not allowed as an identifier because it "
-                              "is used by the context object itself.")
-
-        if name in self._checkpoint:
-            if checkpoint:
-                logger.debug(f"Loading parameters from checkpoint for '{name}'.")
-                item = _load_state_dict_into_item(item, self._checkpoint[name])
-            else:
-                logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
-
-        if params["cuda"] and callable(getattr(item, "cuda", None)):
-            if cuda:
-                logger.debug(f"Moving '{name}' to CUDA.")
-                item = item.cuda()
-            else:
-                logger.debug(f"Not moving item '{name}' to cuda due to item specific config.")
-
-        if isinstance(item, torch.nn.Module):
-            if params["distributed"] and any([p.requires_grad for p in item.parameters()]):
-                logger.debug(f"Converting to distributed for model '{name}'.")
-
-                item = torch.nn.parallel.DistributedDataParallel(
-                    module=item,
-                    device_ids=[torch.cuda.current_device()]
-                )
-
-        elif isinstance(item, Recorder):
-            item.set_output_dir(output_dir)
-
-            if not is_master():
-                item.silence()
-
-        self._items[name] = ContextItem(handle=item, cuda=cuda, checkpoint=checkpoint)
-
-    def state_dict(self) -> dict:
-        """Returns the combined state_dict of all contained items
-
-        Returns:
-            dict: A dict that maps names to state_dicts
-        """
-        dict_with_state = {
-            "__torch_version": torch.__version__
-        }
-
-        _supported_types = (int, float, complex, str)
-
-        for name, item in self._items.items():
-
-            if item.checkpoint:
-                if callable(getattr(item.handle, "state_dict", None)):
-                    if isinstance(item.handle, torch.nn.parallel.DistributedDataParallel):
-                        dict_with_state[name] = item.handle.module.state_dict()
-                    else:
-                        dict_with_state[name] = item.handle.state_dict()
-                elif isinstance(item.handle, _supported_types):
-                    dict_with_state[name] = {
-                        "native_value": item.handle
-                    }
-            else:
-                logger.debug(f"Not saving item '{name}' to checkpoint due to item specific config.")
-
-        return dict_with_state
-
-    def load_state_dict(self, state : dict) -> None:
-        object.__setattr__(self, "_checkpoint", state)
-
-        for name, item in self._items.items():
-            if item.checkpoint:
-                item.handle = _load_state_dict_into_item(item.handle, self._checkpoint[name])
-            else:
-                logger.debug(f"Not loading item '{name}' from checkpoint due to item specific config.")
-
-
 #
 # Internal
 #
@@ -433,12 +287,6 @@ def _initialize(_params):
 
     random_gen.__wrapped__ = random.Random(params["random_seed"])
 
-    context.__wrapped__ = TorchContext()
-
-    if params["checkpoint"]:
-        logger.info(f"Loading checkpoint '{params['checkpoint']}'.")
-        context.load_state_dict(load_checkpoint(params["checkpoint"]))
-
     if params["distributed"]:
         init_distributed()
 
@@ -463,82 +311,12 @@ atexit.register(_cleanup)
 #
 # private Helpers
 #
-
-_supported_types = (int, float, complex, str)
-
-
-def _load_state_dict_into_item(item, state_dict):
-
-    if callable(getattr(item, "load_state_dict", None)):
-        if isinstance(item, torch.nn.parallel.DistributedDataParallel):
-            item.module.load_state_dict(_move_to_same_device_as(state_dict, item.module))
-        else:
-            item.load_state_dict(_move_to_same_device_as(state_dict, item))
-
-    elif isinstance(item, _supported_types):
-        return state_dict["native_value"]
-        
-    else:
-        logger.debug(f"Cannot checkpoint object of type '{type(item)}'.")
-
-    return item
-
-
-def _get_item_state_dict(item):
-    if callable(getattr(item, "state_dict", None)):
-        if isinstance(item, torch.nn.parallel.DistributedDataParallel):
-            return item.module.state_dict()
-        else:
-            return item.state_dict()
-    elif isinstance(item, _supported_types):
-        return {
-            "native_value": item
-        }
-    else:
-        logger.debug(f"Cannot checkpoint object of type '{type(item)}'")
-
-    return None
-
-
-def _move_to_same_device_as(to_move, target):
-    if hasattr(target, "device"):
-        return _move_to_device(to_move, target.device)
-
-    elif callable(getattr(target, "parameters", None)):
-        try:
-            return _move_to_device(to_move, next(target.parameters()).device)
-        except StopIteration:
-            pass
-
-    return to_move
-
-
-def _move_to_device(obj, device):
-    if isinstance(obj, dict):
-        res = {}
-        for name, value in obj.items():
-            res[name] = _move_to_device(value, device)
-
-    elif isinstance(obj, list) or isinstance(obj, tuple):
-        res = []
-        for i in range(len(obj)):
-            res.append(_move_to_device(obj[i]))
-
-    elif callable(getattr(obj, "to", None)):
-        res = obj.to(device=device)
-
-    else:
-        raise Exception(f"Unsupported object type '{type(obj)}'")
-
-    return res
-
-
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
     if directory.exists():
-        chars = string.ascii_uppercase + string.ascii_lowercase + string.digits
+        chars = string.digits + string.ascii_lowercase # + string.ascii_uppercase
         suffix = "".join(random.SystemRandom().choice(chars) for _ in range(6))
         directory = directory.with_name(f"{directory.name}-{suffix}")
 

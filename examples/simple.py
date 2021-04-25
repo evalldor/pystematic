@@ -1,8 +1,8 @@
-import pystematic
+import pystematic.classic as ps
 
-@pystematic.experiment
-def my_experiment(parameters, context):
+@ps.experiment
+def my_experiment(params):
     print("Hello from my_experiment")
 
 if __name__ == "__main__":
-    pystematic.global_entrypoint()
+    my_experiment.cli()
