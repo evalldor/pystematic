@@ -4,11 +4,11 @@ API documentation
 Decorators and entrypoint
 -------------------------
 
-.. autodecorator:: pystematic.experiment(*, name=None, inherit_params=None, defaults=None)
+.. autodecorator:: pystematic.torch.experiment(name=None, inherit_params=None, defaults={}, group=None)
 
-.. autodecorator:: pystematic.parameter
+.. autodecorator:: pystematic.torch.parameter
 
-.. autofunction:: pystematic.global_entrypoint
+.. autofunction:: pystematic.torch.group(name=None)
 
 
 Experiment API
@@ -21,7 +21,7 @@ Global attributes
 These attributes holds information related to the current experiment. Note that
 they are uninitialized until an experiment has actually started.
 
-.. autodata:: pystematic.output_dir
+.. autodata:: pystematic.torch.output_dir
     :annotation: : pathlib.Path
 
     Holds a :code:`pathlib.Path` object that points to the current output
@@ -31,60 +31,53 @@ they are uninitialized until an experiment has actually started.
     yourself, it is your responsibly to use this output directory.
 
 
-.. autodata:: pystematic.params 
+.. autodata:: pystematic.torch.params 
     :annotation: : dict
 
     Holds a dict of all parameters of the current experiment.
 
 
-.. autodata:: pystematic.context
-    :no-value:
-
-    Holds the context object for the current experiment.
-
 
 General
 +++++++
 
-.. autofunction:: pystematic.new_seed
+.. autofunction:: pystematic.torch.new_seed
 
-.. autofunction:: pystematic.run_experiment
+.. autofunction:: pystematic.torch.run_parameter_sweep
 
-.. autofunction:: pystematic.run_parameter_sweep
+.. autofunction:: pystematic.torch.launch_subprocess
 
-.. autofunction:: pystematic.launch_subprocess
-
-.. autofunction:: pystematic.is_subprocess
+.. autofunction:: pystematic.torch.is_subprocess
 
 
 Distributed
 +++++++++++
 
-.. autofunction:: pystematic.init_distributed
+.. autofunction:: pystematic.torch.init_distributed
 
-.. autofunction:: pystematic.is_distributed
+.. autofunction:: pystematic.torch.is_distributed
 
-.. autofunction:: pystematic.is_master
+.. autofunction:: pystematic.torch.is_master
 
-.. autofunction:: pystematic.get_num_processes
+.. autofunction:: pystematic.torch.get_num_processes
 
-.. autofunction:: pystematic.get_rank
+.. autofunction:: pystematic.torch.get_rank
 
-.. autofunction:: pystematic.distributed_barrier
+.. autofunction:: pystematic.torch.distributed_barrier
 
 
 Checkpoints
 +++++++++++
 
-.. autofunction:: pystematic.save_checkpoint
+.. autofunction:: pystematic.torch.save_checkpoint
 
-.. autofunction:: pystematic.load_checkpoint
+.. autofunction:: pystematic.torch.load_checkpoint
 
 
 Recording
 ---------
 
-.. autoclass:: pystematic.Recorder
+.. autoclass:: pystematic.torch.Recorder
 
     .. autoproperty:: count
 
@@ -104,18 +97,11 @@ Recording
 Torch context
 -------------
     
-.. autoclass:: pystematic.TorchContext
+.. autoclass:: pystematic.torch.ContextObject
 
-    .. automethod:: add
-
-    .. automethod:: state_dict
-
-    .. automethod:: load_state_dict
     
 Components
 ----------
 
-.. autoclass:: pystematic.Counter
-
-.. autoclass:: pystematic.BetterDataLoader
+.. autoclass:: pystematic.torch.BetterDataLoader
 

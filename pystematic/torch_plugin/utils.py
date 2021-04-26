@@ -122,7 +122,7 @@ class Resource:
     def allocate(self, num_resources):
         if num_resources > len(self._resources):
             raise ValueError(f"There are only '{len(self._resources)}' distinct "
-                              "resources available. Tried to allocate '{num_resources}'.")
+                             f"resources available. Tried to allocate '{num_resources}'.")
         
         ids_with_least_count = sorted(self._resources.keys(), key=lambda id: self._resources[id])[:num_resources]
 
