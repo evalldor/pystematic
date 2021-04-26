@@ -6,7 +6,6 @@ import tensorboardX
 import torch
 from PIL import Image
 
-
 class Recorder:
     """Used for recording metrics during training and evaluation.
     
@@ -26,7 +25,7 @@ class Recorder:
         
         Args:
             output_dir (str, optional): The output directory store data in.
-                Defaults to None.
+                Defaults to :attr:`pystematic.output_dir`.
             tensorboard (bool, optional): If the recorder should write tensorboard 
                 logs. Defaults to True.
             file (bool, optional): If the recorder should write to plain files. 
@@ -36,6 +35,10 @@ class Recorder:
         """
         self._counter = 0
 
+        if output_dir is None:
+            from pystematic import torch as pst
+            output_dir = pst.output_dir
+            
         self._output_dir = output_dir
         self._recording_backends = []
         
@@ -47,13 +50,6 @@ class Recorder:
 
         if console:
             self._recording_backends.append(ConsoleBackend())
-
-    def set_output_dir(self, output_dir):
-        """This method is called by the pytorch context."""
-        self._output_dir = output_dir
-
-        for backend in self._recording_backends:
-            backend.set_output_dir(self._output_dir)
 
     def silence(self):
         """A recorder may be silenced when running distributed training, in
@@ -137,9 +133,6 @@ class Recorder:
 
 class RecorderBackend:
 
-    def set_output_dir(self, output_dir):
-        pass
-
     def step(self):
         """Called every time the counter in the logger is changed. Can be used
         to flush buffers etc.
@@ -164,9 +157,6 @@ class TensorboardBackend(RecorderBackend):
     shared_tensorboard_logger = None
 
     def __init__(self, output_dir):
-        self._output_dir = output_dir
-
-    def set_output_dir(self, output_dir):
         self._output_dir = output_dir
 
     def _get_tb_logger(self):
@@ -206,9 +196,6 @@ class ConsoleBackend(RecorderBackend):
 class FileBackend(RecorderBackend):
 
     def __init__(self, output_dir):
-        self.set_output_dir(output_dir)
-
-    def set_output_dir(self, output_dir):
         self._output_dir = output_dir
 
     def scalar(self, tag, scalar, counter):

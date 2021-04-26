@@ -1,53 +1,89 @@
-*A collection of tools that helps you to systematically setup and run
-reproducible experiments in pytorch.*
+Pystematic is a framework that helps you to systematically setup and run
+reproducible experiments in python. The main concept revolves around defining
+experiments together with a set of parameters.
+
+For example, the following code defines an experiment named ``example`` with two
+parameters, ``string_param`` and ``int_param``:
+
+.. code-block:: 
+
+    import pystematic.classic as ps
+    
+    @ps.parameter(
+        name="string_param",
+        type=str,
+        help="A string parameter"
+    )
+    @ps.parameter(
+        name="int_param",
+        type=int,
+        help="An int parameter",
+        default=0
+    )
+    @ps.experiment
+    def example(params):
+        print("Hello from example experiment.")
+        print("string_param is {params['string_param']} and int_param is {params['int_param']}.")
+
+
+You can run the experiment by either supplying a dict containing the values for
+the parameters:
+
+.. code-block:: 
+
+    if __name__ == "__main__":
+        example.run({
+        
+        })
+
+.. code-block:: 
+
+    $ python path/to/file.py
+
+
+Or you can run the experiment from the command line:
+
+.. code-block:: 
+
+    if __name__ == "__main__":
+        example.cli()
+
+.. code-block:: 
+
+    $ python path/to/file.py --string-param hello --int-param 10
+
+Full documentation is available at ???.
+
+Note that this project is still in the early stages. There may be some rough
+edges.
+
 
 TODO
 ====
 
-- !!python/tuple
-- make context manually created. 
-- Make checkpoint loading manual. Add global property checkpoint
-- Main function should only take params as argument
+- Parameter groups
 - Make proper experiment decorator
 - Make clearer separation between pytorch specifics and general stuff
 
 CLI
 ---
-- Builds on Click
 - Define experiment.
-- Define args.
-- global_entrypoint
+- Define params.
 - running experiments
-
-
-Context
--------
-- Holds all state related to experiment
-- Configuration/params
-- Default params
-- Examples in script
 
 
 
 Reproducibility
 ---------------
 - "One seed to rule them all"
-- random seed, seeding you random number generators
+- random seed, seeding your random number generators
 - pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
-
-
-
-Training
---------
-- Looper (optional)
 
 
 Recording
 ---------
 - wrapped because of transparency for distributed training
 - Backends
-- adding and commiting.
-- gobal_step required (= x-axis in all data charts)
 
 Counters
 --------
@@ -58,9 +94,5 @@ Distributed training
 - Launching
 - default args
 - context helper methods
-- idendical random seeds
+- identical random seeds
 
-
-
-
-All experiments are registered with pystematic.global_entrypoint
