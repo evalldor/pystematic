@@ -21,8 +21,8 @@ parameters, ``string_param`` and ``int_param``:
         default=0
     )
     @ps.experiment
-    def example(params):
-        print("Hello from example experiment.")
+    def example_experiment(params):
+        print("Hello from example_experiment.")
         print("string_param is {params['string_param']} and int_param is {params['int_param']}.")
 
 
@@ -32,8 +32,9 @@ the parameters:
 .. code-block:: 
 
     if __name__ == "__main__":
-        example.run({
-        
+        example_experiment.run({
+            "string_param": "hello",
+            "int_param": 10
         })
 
 .. code-block:: 
@@ -46,7 +47,7 @@ Or you can run the experiment from the command line:
 .. code-block:: 
 
     if __name__ == "__main__":
-        example.cli()
+        example_experiment.cli()
 
 .. code-block:: 
 
@@ -58,41 +59,38 @@ Note that this project is still in the early stages. There may be some rough
 edges.
 
 
-TODO
-====
+.. TODO
+.. ====
+.. - Parameter groups
 
-- Parameter groups
-- Make proper experiment decorator
-- Make clearer separation between pytorch specifics and general stuff
-
-CLI
----
-- Define experiment.
-- Define params.
-- running experiments
+.. CLI
+.. ---
+.. - Define experiment.
+.. - Define params.
+.. - running experiments
 
 
 
-Reproducibility
----------------
-- "One seed to rule them all"
-- random seed, seeding your random number generators
-- pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
+.. Reproducibility
+.. ---------------
+.. - "One seed to rule them all"
+.. - random seed, seeding your random number generators
+.. - pitfalls with random seeds. (Code conditional on process rank that calls new_seed())
 
 
-Recording
----------
-- wrapped because of transparency for distributed training
-- Backends
+.. Recording
+.. ---------
+.. - wrapped because of transparency for distributed training
+.. - Backends
 
-Counters
---------
+.. Counters
+.. --------
 
-Distributed training
---------------------
-- Transparent switching between distributed and normal training.
-- Launching
-- default args
-- context helper methods
-- identical random seeds
+.. Distributed training
+.. --------------------
+.. - Transparent switching between distributed and normal training.
+.. - Launching
+.. - default args
+.. - context helper methods
+.. - identical random seeds
 
