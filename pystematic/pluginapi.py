@@ -30,7 +30,7 @@ def parameter_decorator(
     
     default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
     required: bool = False,
-    allowed_values: list[typing.Any] = None,
+    allowed_values: typing.List[typing.Any] = None,
     is_flag: bool = False,
     multiple: bool = False,
     allow_from_file: bool = True,
@@ -139,6 +139,8 @@ def experiment_decorator(name=None, inherit_params=None, defaults={}, group=None
             defaults_override=defaults
         )
 
+        existing_params = [param.name for param in experiment.get_parameters()]
+
         if inherit_params is not None:
             if not isinstance(inherit_params, (tuple, list)):
                 experiments_to_inherit_from = [inherit_params]
@@ -148,11 +150,13 @@ def experiment_decorator(name=None, inherit_params=None, defaults={}, group=None
             for exp in experiments_to_inherit_from:
                 if isinstance(exp, core.Experiment):
                     for param in exp.param_manager.get_parameters():
-                        experiment.add_parameter(param)
+                        if param.name not in existing_params:
+                            experiment.add_parameter(param)
                 elif callable(exp):
                     if hasattr(exp, "__params_memo__"):
                         for param in exp.__params_memo__:
-                            experiment.add_parameter(param)
+                            if param.name not in existing_params:
+                                experiment.add_parameter(param)
                 else:
                     raise ValueError(f"Unknown value passed to 'inherit_params': {exp}")
 

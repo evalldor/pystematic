@@ -3,6 +3,8 @@ import logging
 from .recording import Recorder
 logger = logging.getLogger('pystematic_torchcontext')
 
+
+
 class TorchContext:
     """A context object is like a big container that holds all pytorch related
     objects you need. Its main use is to allow a pytorch session so transition
@@ -32,6 +34,18 @@ class TorchContext:
 
     def load_state_dict(self):
         raise NotImplementedError()
+
+    def autotransform(self):
+        from pystematic.torch import params
+        if params["checkpoint"]:
+            with open(params["checkpoint"], "rb") as f:
+                self.load_state_dict(torch.load(f))
+
+        if params["cuda"]:
+            self.cuda()
+
+        if params["distributed"]:
+            self.ddp()
  
     def _wrap_value(self, value):
         if isinstance(value, (list, tuple)):

@@ -81,6 +81,14 @@ class TorchApi(ClassicApi):
         with open(checkpoint_file_path, "rb") as f:
             return torch.load(f, map_location="cpu")
 
+    def run_parameter_sweep(self, experiment, list_of_params, max_num_processes=1, num_gpus_per_process=None) -> None:
+        """Runs an experiment with a set of different params. At most
+        :obj:`max_num_processes` concurrent processes will be used.
+        """
+
+        pool = utils.ProcessQueue(max_num_processes, range(torch.cuda.device_count()), num_gpus_per_process)
+        pool.run_and_wait_for_completion(experiment, list_of_params)
+
     #
     # Pytorch distributed
     #

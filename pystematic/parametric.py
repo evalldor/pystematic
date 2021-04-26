@@ -136,7 +136,7 @@ class Parameter:
     def __init__(
         self,
         name: str,
-        flags: typing.Union[None, list[str], str] = None,
+        flags: typing.Union[None, typing.List[str], str] = None,
         type: typing.Callable[[str], typing.Any] = str,
         nargs: typing.Union[typing.Literal["?"], typing.Literal["*"], typing.Literal["+"], int, None] = None,
         default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
@@ -246,10 +246,10 @@ class Parameter:
         value = self._convert_to_correct_nargs(value)
         return self._convert_to_correct_type(value)
 
-    def get_long_flags(self) -> list[str]:
+    def get_long_flags(self) -> typing.List[str]:
         return [flag for flag in self.flags if flag.startswith("--")]
 
-    def get_short_flags(self) -> list[str]:
+    def get_short_flags(self) -> typing.List[str]:
         return [flag for flag in self.flags if re.match(r"^-[^-]", flag)]
 
     def get_envvar(self, prefix=None):
@@ -416,7 +416,7 @@ class ParameterManager:
     def add_param(
         self,
         name: str,
-        flags: typing.Union[None, list[str], str] = None,
+        flags: typing.Union[None, typing.List[str], str] = None,
         type: typing.Callable[[str], typing.Any] = str,
         nargs: typing.Union[typing.Literal["?"], typing.Literal["*"], typing.Literal["+"], int, None] = None,
         default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
