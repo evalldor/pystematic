@@ -3,6 +3,7 @@ import pytest
 import pystematic.core as core
 import pystematic.classic as classic
 
+
 def test_main_function_is_run():
 
     class CustomException(Exception):
@@ -80,3 +81,4 @@ def test_experiment_group():
 
     with pytest.raises(Exp2Ran):
         group.cli(["exp2", "--param2", "value"])
+

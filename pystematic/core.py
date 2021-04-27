@@ -6,6 +6,7 @@ import typing
 
 from . import parametric
 
+
 class PystematicParameterBehaviour(parametric.DefaultParameterBehaviour):
 
     def after_init(self, param, allow_from_file=None, **kwargs):
@@ -79,6 +80,7 @@ class Experiment:
         self.default_params = default_params
         self.main_function = main_function
         self.name = name or main_function.__name__.lower().replace("_", "-")
+        self._defaults_override = defaults_override
         
         self.param_manager = parametric.ParameterManager(
             defaults_override=defaults_override,
@@ -131,7 +133,6 @@ class Experiment:
             self.main_function(params)
         finally:
             self.api_object.cleanup()
-
 
 def _run_experiment_by_name(experiment_module, experiment_name, params):
     # used by Experiment.run_in_new_process
