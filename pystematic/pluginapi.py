@@ -15,15 +15,6 @@ def register_plugin(plugin_object, plugin_namespace):
     sys.modules[f"pystematic.{plugin_namespace}"] = plugin_object
 
 
-
-class PystematicParameterBehaviour(parametric.DefaultParameterBehaviour):
-
-    def after_init(self, param, allow_from_file=None, **kwargs):
-        super().after_init(param, **kwargs)
-        param.allow_from_file = allow_from_file
-
-
-
 def parameter_decorator(
     name: str,
     type: typing.Callable[[str], typing.Any] = str,
@@ -69,45 +60,23 @@ def parameter_decorator(
     """
     
     def decorator(experiment):
-        behaviours = [PystematicParameterBehaviour()]
 
-        if behaviour is not None:
-            behaviours.append(behaviour)
-
-        nargs = None
-        _type = type
-        if is_flag:
-            if allowed_values is not None:
-                raise ValueError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
-            
-            if multiple:
-                raise ValueError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
-            
-            behaviours.append(parametric.BooleanFlagBehaviour())
-        else:
-            if allowed_values is not None:
-                _type = parametric.ChoiceType(allowed_values)
-            elif _type == bool:
-                _type = parametric.BooleanType()
-
-        if multiple:
-            nargs = "*"
-
-        param = parametric.Parameter(
+        param = core.Parameter(
             name=name,
-            type=_type,
-
-            required=required,
+            type=type,
+            
             default=default,
-            nargs=nargs,
+            required=required,
+            allowed_values=allowed_values,
+            is_flag=is_flag,
+            multiple=multiple,
+            allow_from_file=allow_from_file,
             envvar=envvar,
 
             help=help,
             default_help=default_help,
             hidden=hidden,
-            behaviour=parametric.CompositBehaviour(*behaviours),
-
-            allow_from_file=allow_from_file
+            behaviour=behaviour,
         )
 
         if isinstance(experiment, core.Experiment):
@@ -123,7 +92,14 @@ def parameter_decorator(
     return decorator
 
 
-def experiment_decorator(name=None, inherit_params=None, defaults={}, group=None, api_object=None, default_params=None):
+def experiment_decorator(
+    name=None, 
+    inherit_params=None, 
+    defaults={}, 
+    group=None, 
+    api_object=None, 
+    default_params=None
+):
     if callable(name):
         main_function = name
         name = None

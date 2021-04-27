@@ -2,8 +2,74 @@ import sys
 import functools
 import multiprocessing
 import importlib
+import typing
 
 from . import parametric
+
+class PystematicParameterBehaviour(parametric.DefaultParameterBehaviour):
+
+    def after_init(self, param, allow_from_file=None, **kwargs):
+        super().after_init(param, **kwargs)
+        param.allow_from_file = allow_from_file
+
+
+def Parameter(
+    name: str,
+    type: typing.Callable[[str], typing.Any] = str,
+    
+    default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
+    required: bool = False,
+    allowed_values: typing.List[typing.Any] = None,
+    is_flag: bool = False,
+    multiple: bool = False,
+    allow_from_file: bool = True,
+    envvar: typing.Union[str, None, typing.Literal[False]] = None,
+
+    help: typing.Optional[str] = None,
+    default_help: typing.Optional[str] = None,
+    hidden = False,
+    behaviour = None,
+):
+    behaviours = [PystematicParameterBehaviour()]
+
+    if behaviour is not None:
+        behaviours.append(behaviour)
+
+    nargs = None
+    _type = type
+    if is_flag:
+        if allowed_values is not None:
+            raise ValueError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
+        
+        if multiple:
+            raise ValueError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
+        
+        behaviours.append(parametric.BooleanFlagBehaviour())
+    else:
+        if allowed_values is not None:
+            _type = parametric.ChoiceType(allowed_values)
+        elif _type == bool:
+            _type = parametric.BooleanType()
+
+    if multiple:
+        nargs = "*"
+
+    return parametric.Parameter(
+        name=name,
+        type=_type,
+
+        required=required,
+        default=default,
+        nargs=nargs,
+        envvar=envvar,
+
+        help=help,
+        default_help=default_help,
+        hidden=hidden,
+        behaviour=parametric.CompositBehaviour(*behaviours),
+
+        allow_from_file=allow_from_file
+    )
 
 
 class Experiment:
@@ -111,4 +177,3 @@ class ExperimentGroup:
             raise Exception(f"Invalid experiment name '{exp_name}'.")
 
         experiments[exp_name].cli(argv_rest)
-

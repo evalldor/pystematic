@@ -12,6 +12,7 @@ from rich.theme import Theme
 from rich.markup import escape
 
 from . import yaml_wrapper as yaml
+import pystematic.core as core
 
 from pystematic.pluginapi import (
     register_plugin, 
@@ -25,12 +26,10 @@ logger = logging.getLogger('pystematic_classic')
 
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(current_time)
 
-    if directory.exists():
-        chars = string.digits + string.ascii_lowercase # + string.ascii_uppercase
-        suffix = "".join(random.SystemRandom().choice(chars) for _ in range(6))
-        directory = directory.with_name(f"{directory.name}-{suffix}")
+    chars = string.digits + string.ascii_lowercase # + string.ascii_uppercase
+    suffix = "".join(random.SystemRandom().choice(chars) for _ in range(6))
+    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(f"{current_time}-{suffix}")
 
     return directory
 
@@ -187,47 +186,47 @@ class ParamsFileBehaviour(parametric.DefaultParameterBehaviour):
                     result_dict.set_value_by_name(key, value)
 
 
-@parameter_decorator(
-    name="output_dir",
-    default="./output",
-    help="Parent directory to store all run-logs in. Will be created if it does not exist.",
-    type=str
-)
-@parameter_decorator(
-    name="debug",
-    default=False,
-    help="Sets debug flag on/off.",
-    type=bool,
-    is_flag=True
-)
-@parameter_decorator(
-    name="params_file",
-    type=pathlib.Path,
-    help="Read experiment parameters from FILE.",
-    behaviour=ParamsFileBehaviour(),
-    allow_from_file=False
-)
-@parameter_decorator(
-    name="random_seed",
-    default=functools.partial(random.getrandbits, 32),
-    help="The value to seed random number generators with.",
-    type=int, 
-    default_help="<randomly generated>"
-)
-@parameter_decorator(
-    name="subprocess",
-    default=None,
-    help="Internally used to indicate that this process is a subprocess. DO NOT USE MANUALLY.",
-    type=pathlib.Path,
-    allow_from_file=False,
-    hidden=True
-)
-def classic_params():
-    pass
+classic_params = [
+    core.Parameter(
+        name="output_dir",
+        default="./output",
+        help="Parent directory to store all run-logs in. Will be created if it does not exist.",
+        type=str
+    ),
+    core.Parameter(
+        name="debug",
+        default=False,
+        help="Sets debug flag on/off.",
+        type=bool,
+        is_flag=True
+    ),
+    core.Parameter(
+        name="params_file",
+        type=pathlib.Path,
+        help="Read experiment parameters from FILE.",
+        behaviour=ParamsFileBehaviour(),
+        allow_from_file=False
+    ),
+    core.Parameter(
+        name="random_seed",
+        default=functools.partial(random.getrandbits, 32),
+        help="The value to seed random number generators with.",
+        type=int, 
+        default_help="<randomly generated>"
+    ),
+    core.Parameter(
+        name="subprocess",
+        default=None,
+        help="Internally used to indicate that this process is a subprocess. DO NOT USE MANUALLY.",
+        type=pathlib.Path,
+        allow_from_file=False,
+        hidden=True
+    ),
+]
 
 api_object = ClassicApi()
 api_object.parameter = parameter_decorator
-api_object.experiment = functools.partial(experiment_decorator, api_object=api_object, default_params=classic_params.__params_memo__)
+api_object.experiment = functools.partial(experiment_decorator, api_object=api_object, default_params=classic_params)
 api_object.group = functools.partial(group_decorator, experiment_decorator=api_object.experiment)
 
 register_plugin(api_object, "classic")

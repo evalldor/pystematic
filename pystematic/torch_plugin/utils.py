@@ -1,7 +1,6 @@
 import contextlib
 import os
 import logging
-import time
 import multiprocessing
 
 import torch
@@ -90,25 +89,17 @@ class ProcessQueue:
                 gpus = self._gpu_resource.allocate(self._num_gpus_per_process)
 
                 with envvars({"CUDA_VISIBLE_DEVICES": ",".join([str(id) for id in gpus])}):
-                    time.sleep(2)
                     proc = experiment.run_in_new_process(params)
                     proc.gpus = gpus
                     self._live_processes.append(proc)
             else:
                 
-                time.sleep(2)
                 proc = experiment.run_in_new_process(params)
                 self._live_processes.append(proc)
             
         while len(self._live_processes) > 0:
             self._wait()
 
-class ProcessPool:
-    pass
-
-
-class Task:
-    pass
 
 class Resource:
     #TODO: add allocation cap and distinct option
