@@ -1,17 +1,17 @@
 import pytest
 
 import pystematic.core as core
+import pystematic.classic as classic
 
 def test_main_function_is_run():
 
     class CustomException(Exception):
         pass
 
-    def main_function(params):
+    @classic.experiment
+    def exp(params):
         raise CustomException()
 
-    exp = core.Experiment(main_function)
-    
     with pytest.raises(CustomException):
         exp.cli([])
 
@@ -24,22 +24,21 @@ def test_params_are_added():
     class CustomException(Exception):
         pass
     
-    @core.parameter_decorator(
+    @classic.parameter(
         name="test_param"
     )
-    @core.parameter_decorator(
+    @classic.parameter(
         name="int_param",
         type=int
     )
-    def main_function(params):
+    @classic.experiment
+    def exp(params):
         assert "test_param" in params
         assert params["test_param"] == "test"
 
         assert "int_param" in params
         assert params["int_param"] == 3
         raise CustomException()
-
-    exp = core.Experiment(main_function)
     
     with pytest.raises(CustomException):
         exp.cli(["--test-param", "test", "--int-param", "3"])
@@ -56,26 +55,25 @@ def test_experiment_group():
     class Exp2Ran(Exception):
         pass
     
-    @core.parameter_decorator(
+    @classic.group
+    def group(params):
+        pass
+
+    @classic.parameter(
         name="param1"
     )
+    @group.experiment
     def exp1(params):
         assert params["param1"] == "value"
         raise Exp1Ran()
 
-    @core.parameter_decorator(
+    @classic.parameter(
         name="param2"
     )
+    @group.experiment
     def exp2(params):
         assert params["param2"] == "value"
         raise Exp2Ran()
-
-    exp_one = core.Experiment(exp1)
-    exp_two = core.Experiment(exp2)
-
-    group = core.ExperimentGroup(lambda x:x)
-    group.add_experiment(exp_one)
-    group.add_experiment(exp_two)
 
     with pytest.raises(Exp1Ran):
         group.cli(["exp1", "--param1", "value"])
