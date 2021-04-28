@@ -1,8 +1,18 @@
 [tool.poetry]
 name = "pystematic"
-version = "0.1.0"
-description = ""
-authors = ["Erik Valldor <erik.valldor@gmail.com>"]
+version = "0.2.0"
+description = "A framework that helps you setup and run reproducible experiments."
+repository = ""
+documentation = ""
+license = "MIT"
+readme = "README.rst"
+authors = ["E.Valldor"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering"
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"

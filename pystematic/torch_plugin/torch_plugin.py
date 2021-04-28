@@ -16,6 +16,8 @@ from pystematic.pluginapi import (
 
 from . import context, recording, torchutil
 
+import pystematic.core as core
+
 logger = logging.getLogger('pystematic_torch')
 
 class TorchApi(ClassicApi):
@@ -153,82 +155,82 @@ class TorchApi(ClassicApi):
             torch.distributed.barrier()
 
 
-@parameter_decorator(
-    name="checkpoint",
-    type=str,
-    help="Load context from checkpoint.",
-    allow_from_file=False
-)
-@parameter_decorator(
-    name="cuda",
-    default=True,
-    is_flag=True
-)
-@parameter_decorator(
-    name="distributed",
-    help="Launch in distributed mode.",
-    default=False,
-    allow_from_file=False,
-    is_flag=True
-)
-@parameter_decorator(
-    name="local_rank", 
-    type=int,
-    help="For distributed training, gives the local rank for this process. "
-        "This parameter is set automatically by the framework, and should not "
-        "be used manually.",
-    allow_from_file=False,
-    hidden=True,
-)
-@parameter_decorator(
-    name="nproc_per_node",
-    envvar="NPROC_PER_NODE", 
-    type=int, 
-    default=1,
-    help="The number of processes to launch on each node, "
-        "for GPU training, this is recommended to be set "
-        "to the number of GPUs in your system so that "
-        "each process can be bound to a single GPU.",
-)
-@parameter_decorator(
-    name="node_rank", 
-    envvar="NODE_RANK",
-    type=int, 
-    default=0,
-    help="The rank of the node for multi-node distributed training.",
-    allow_from_file=False,
-)
-@parameter_decorator(
-    name="nnodes", 
-    envvar="NNODES",
-    type=int, 
-    default=1,
-    help="The number of nodes to use for distributed training.",
-)
-@parameter_decorator(
-    name="master_addr", 
-    default="127.0.0.1",
-    envvar="MASTER_ADDR",
-    type=str,
-    help="Master node (rank 0)'s address, should be either "
-        "the IP address or the hostname of node 0. Leave "
-        "default for single node training.",
-)
-@parameter_decorator(
-    name="master_port", 
-    default=29500, 
-    envvar="MASTER_PORT",
-    type=int,
-    help="Master node (rank 0)'s free port that needs to "
-        "be used for communciation during distributed "
-        "training.",
-)
-def pytorch_params():
-    pass
+pytorch_params = [
+    core.Parameter(
+        name="checkpoint",
+        type=pathlib.Path,
+        help="Load context from checkpoint.",
+        allow_from_file=False
+    ),
+    core.Parameter(
+        name="cuda",
+        default=True,
+        is_flag=True
+    ),
+    core.Parameter(
+        name="distributed",
+        help="Launch in distributed mode.",
+        default=False,
+        allow_from_file=False,
+        is_flag=True
+    ),
+    core.Parameter(
+        name="local_rank", 
+        type=int,
+        help="For distributed training, gives the local rank for this process. "
+            "This parameter is set automatically by the framework, and should not "
+            "be used manually.",
+        allow_from_file=False,
+        hidden=True,
+    ),
+    core.Parameter(
+        name="nproc_per_node",
+        envvar="NPROC_PER_NODE", 
+        type=int, 
+        default=1,
+        help="The number of processes to launch on each node, "
+            "for GPU training, this is recommended to be set "
+            "to the number of GPUs in your system so that "
+            "each process can be bound to a single GPU.",
+    ),
+    core.Parameter(
+        name="node_rank", 
+        envvar="NODE_RANK",
+        type=int, 
+        default=0,
+        help="The rank of the node for multi-node distributed training.",
+        allow_from_file=False,
+    ),
+    core.Parameter(
+        name="nnodes", 
+        envvar="NNODES",
+        type=int, 
+        default=1,
+        help="The number of nodes to use for distributed training.",
+    ),
+    core.Parameter(
+        name="master_addr", 
+        default="127.0.0.1",
+        envvar="MASTER_ADDR",
+        type=str,
+        help="Master node (rank 0)'s address, should be either "
+            "the IP address or the hostname of node 0. Leave "
+            "default for single node training.",
+    ),
+    core.Parameter(
+        name="master_port", 
+        default=29500, 
+        envvar="MASTER_PORT",
+        type=int,
+        help="Master node (rank 0)'s free port that needs to "
+            "be used for communciation during distributed "
+            "training.",
+    ),
+]
 
 api_object = TorchApi()
 api_object.parameter = parameter_decorator
-api_object.experiment = functools.partial(experiment_decorator, api_object=api_object, default_params=classic_params.__params_memo__+pytorch_params.__params_memo__)
+api_object.experiment = functools.partial(experiment_decorator, api_object=api_object, default_params=classic_params+pytorch_params)
 api_object.group = functools.partial(group_decorator, experiment_decorator=api_object.experiment)
 api_object.ContextObject = context.ContextObject
 api_object.ContextDict = context.ContextDict
