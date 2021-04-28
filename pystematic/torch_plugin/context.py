@@ -37,6 +37,7 @@ class TorchContext:
 
     def autotransform(self):
         from pystematic.torch import params
+        print(params["checkpoint"])
         if params["checkpoint"]:
             with open(params["checkpoint"], "rb") as f:
                 self.load_state_dict(torch.load(f))

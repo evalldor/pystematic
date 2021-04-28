@@ -155,7 +155,7 @@ class TorchApi(ClassicApi):
 
 @parameter_decorator(
     name="checkpoint",
-    type=pathlib.Path,
+    type=str,
     help="Load context from checkpoint.",
     allow_from_file=False
 )
