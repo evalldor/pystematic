@@ -37,10 +37,10 @@ class TorchContext:
 
     def autotransform(self):
         from pystematic.torch import params
-        print(params["checkpoint"])
         if params["checkpoint"]:
+            logger.info(f"Loading checkpoint '{params['checkpoint']}'.")
             with open(params["checkpoint"], "rb") as f:
-                self.load_state_dict(torch.load(f))
+                self.load_state_dict(torch.load(f, map_location="cpu"))
 
         if params["cuda"]:
             self.cuda()
@@ -67,11 +67,15 @@ class TorchContext:
     def _to_cuda(self, item):
         if callable(getattr(item, "cuda", None)):
             return item.cuda()
+        elif isinstance(item, torch.optim.Optimizer):
+            return self._move_to_device(item, f"cuda:{torch.cuda.current_device()}")
         return item
 
     def _to_cpu(self, item):
         if callable(getattr(item, "cpu", None)):
             return item.cpu()
+        elif isinstance(item, torch.optim.Optimizer):
+            return self._move_to_device(item, "cpu")
         return item
 
     def _to_ddp(self, name, item):
@@ -113,6 +117,7 @@ class TorchContext:
         return None
 
     def _set_state_dict(self, item, state_dict):
+        
         supported_types = (int, float, complex, str)
         if callable(getattr(item, "load_state_dict", None)):
             if isinstance(item, torch.nn.parallel.DistributedDataParallel):
@@ -121,7 +126,7 @@ class TorchContext:
                 item.load_state_dict(self._move_to_same_device_as(state_dict, item))
 
         elif isinstance(item, supported_types):
-            return state_dict["native_value"]
+            return state_dict["native_value"] if "native_value" in state_dict else state_dict["count"]
             
         else:
             logger.debug(f"Cannot checkpoint object of type '{type(item)}'.")
@@ -146,16 +151,19 @@ class TorchContext:
             for name, value in obj.items():
                 res[name] = self._move_to_device(value, device)
 
-        elif isinstance(obj, list) or isinstance(obj, tuple):
+        elif isinstance(obj, (list, tuple)):
             res = []
             for i in range(len(obj)):
-                res.append(self._move_to_device(obj[i]))
+                res.append(self._move_to_device(obj[i], device))
 
         elif callable(getattr(obj, "to", None)):
             res = obj.to(device=device)
-
+        elif isinstance(obj, torch.optim.Optimizer):
+            obj.load_state_dict(self._move_to_device(obj.state_dict(), device))
+            res = obj
         else:
-            raise Exception(f"Unsupported object type '{type(obj)}'")
+            res = obj
+            # raise Exception(f"Unsupported object type '{type(obj)}'")
 
         return res
 
@@ -207,8 +215,9 @@ class ContextObject(TorchContext):
 
     def load_state_dict(self, state : dict) -> None:
 
-        for name, item in self._items.items():
-            self._items[name] = self._set_state_dict(item, state[name])
+        for name, item_state in state.items():
+            if name in self._items:
+                self._items[name] = self._set_state_dict(self._items[name], item_state)
             
 
 class ContextDict(TorchContext):
@@ -261,8 +270,9 @@ class ContextDict(TorchContext):
 
     def load_state_dict(self, state : dict) -> None:
 
-        for name, item in self._items.items():
-            self._items[name] = self._set_state_dict(item, state[name])
+        for name, item in state.items():
+            if name in self._items:
+                self._items[name] = self._set_state_dict(self._items[name], item)
             
 
 class ContextList(TorchContext):
@@ -320,6 +330,6 @@ class ContextList(TorchContext):
 
     def load_state_dict(self, state : dict) -> None:
 
-        for i, item in enumerate(self._items):
-            self._items[i] = self._set_state_dict(item, state[i])
+        for i, item in enumerate(self.state):
+            self._items[i] = self._set_state_dict(self._items[i], item)
        
