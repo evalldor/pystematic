@@ -98,7 +98,8 @@ def experiment_decorator(
     defaults={}, 
     group=None, 
     api_object=None, 
-    default_params=None
+    default_params=None,
+    no_output_dir=False
 ):
     if callable(name):
         main_function = name
@@ -112,7 +113,8 @@ def experiment_decorator(
             main_function=main_function, 
             default_params=default_params, 
             name=name, 
-            defaults_override=defaults
+            defaults_override=defaults,
+            no_output_dir=no_output_dir
         )
 
         existing_params = [param.name for param in experiment.get_parameters()]

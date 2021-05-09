@@ -10,7 +10,7 @@ than one time have i been guilty of hard-coding my hyperparamters, running the
 code and tweaking the parameters directly in the source code util i eventually
 lose track of which parameters gave which results. 
 
-This framework is ment to help you in being systematic about how you declare and
+This framework is ment to help me (you) in being systematic about how you declare and
 assign values to the parameters of your experiment, and keeping books on what
 result they produced. 
 

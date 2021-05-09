@@ -75,11 +75,12 @@ def Parameter(
 
 class Experiment:
 
-    def __init__(self, api_object, main_function, default_params=None, name=None, defaults_override={}):
+    def __init__(self, api_object, main_function, default_params=None, name=None, defaults_override={}, no_output_dir=False):
         self.api_object = api_object
         self.default_params = default_params
         self.main_function = main_function
         self.name = name or main_function.__name__.lower().replace("_", "-")
+        self.no_output_dir = no_output_dir
         self._defaults_override = defaults_override
         
         self.param_manager = parametric.ParameterManager(

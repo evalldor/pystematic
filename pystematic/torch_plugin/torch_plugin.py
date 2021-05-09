@@ -92,7 +92,7 @@ class TorchApi(ClassicApi):
         pool.run_and_wait_for_completion(experiment, list_of_params)
 
     #
-    # Pytorch distributed
+    # Pytorch distributed data parallell
     #
 
     def init_distributed(self) -> None:

@@ -7,17 +7,15 @@ Welcome to pystematic's documentation!
 ======================================
 
 This framework has grown out of my own needs as an ML research engineer. The aim
-is to assist in defining and running reproducible ML experiments in **pytorch**. More
-specifically it: 
+is to assist in defining and running reproducible numerical experiments in
+**pytorch**. More specifically it: 
 
-* Makes your experiments easy to run by providing a CLI. 
+* Defines a standard way to declare experiments and all associated parameters. 
 
-* Helps with managing parameters of you experiments (such as learning rates
-  etc.), and makes them assignable from the CLI
+* Provides a CLI for running experiments from the command line.
 
-* Helps you transition seamlessly between distributed and non-distributed sessions.
-
-* Helps with recording stats and keeping track of which parameters gave which result.
+* Helps keeping track of which parameters gave which result by assigning a
+  unique output directory to every run of an experiment.
 
 .. toctree::
    :maxdepth: 2

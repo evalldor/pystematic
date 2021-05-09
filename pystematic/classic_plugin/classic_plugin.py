@@ -88,12 +88,14 @@ class ClassicApi:
             self.params_file.__wrapped__ = pathlib.Path(params["subprocess"])
         else:
             self.output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], experiment.name)
-            self.output_dir.__wrapped__.mkdir(parents=True, exist_ok=True)
             self.params_file.__wrapped__ = self.output_dir.joinpath("parameters.yml")
+        
+            if not experiment.no_output_dir:
+                self.output_dir.mkdir(parents=True, exist_ok=True)
 
-            logger.debug(f"Writing parameters file to '{self.params_file}'.")
-            with self.params_file.open("w") as f:
-                yaml.dump(params, f)
+                logger.debug(f"Writing parameters file to '{self.params_file}'.")
+                with self.params_file.open("w") as f:
+                    yaml.dump(params, f)
 
         self.random_gen.__wrapped__ = random.Random(params["random_seed"])
 

@@ -1,8 +1,8 @@
 API documentation
-======================================
+=================
 
-Decorators and entrypoint
--------------------------
+Decorators
+----------
 
 .. autodecorator:: pystematic.torch.experiment(name=None, inherit_params=None, defaults={}, group=None)
 
