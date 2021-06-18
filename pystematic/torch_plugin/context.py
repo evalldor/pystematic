@@ -65,18 +65,10 @@ class TorchContext:
         return value
 
     def _to_cuda(self, item):
-        if callable(getattr(item, "cuda", None)):
-            return item.cuda()
-        elif isinstance(item, torch.optim.Optimizer):
-            return self._move_to_device(item, f"cuda:{torch.cuda.current_device()}")
-        return item
+        return self._move_to_device(item, f"cuda:{torch.cuda.current_device()}")
 
     def _to_cpu(self, item):
-        if callable(getattr(item, "cpu", None)):
-            return item.cpu()
-        elif isinstance(item, torch.optim.Optimizer):
-            return self._move_to_device(item, "cpu")
-        return item
+        return self._move_to_device(item, "cpu")
 
     def _to_ddp(self, name, item):
         if isinstance(item, TorchContext):
