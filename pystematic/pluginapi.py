@@ -18,6 +18,7 @@ def construct_api_extension():
     obj = Tmp()
     for plugin in all_plugins:
         api_object = plugin.get_api_extension()
+        api_objects.append(api_object)
         namespace = plugin.get_api_namespace()
 
         if namespace is None:
@@ -38,11 +39,13 @@ def experiment_created(experiment):
 
 def init_experiment(experiment, params):
     for api_object in api_objects:
-        api_object._init_experiment_(experiment, params)
+        if hasattr(api_object, "_init_experiment_"):
+            api_object._init_experiment_(experiment, params)
 
 def cleanup():
     for api_object in api_objects:
-        api_object._cleanup_()
+        if hasattr(api_object, "_cleanup_"):
+            api_object._cleanup_()
 
 
 class PystematicPlugin:
