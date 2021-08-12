@@ -1,7 +1,6 @@
 import pytest
 
-import pystematic.core as core
-import pystematic.classic as classic
+import pystematic
 
 
 def test_main_function_is_run():
@@ -9,7 +8,7 @@ def test_main_function_is_run():
     class CustomException(Exception):
         pass
 
-    @classic.experiment
+    @pystematic.experiment
     def exp(params):
         raise CustomException()
 
@@ -25,14 +24,14 @@ def test_params_are_added():
     class CustomException(Exception):
         pass
     
-    @classic.parameter(
+    @pystematic.parameter(
         name="test_param"
     )
-    @classic.parameter(
+    @pystematic.parameter(
         name="int_param",
         type=int
     )
-    @classic.experiment
+    @pystematic.experiment
     def exp(params):
         assert "test_param" in params
         assert params["test_param"] == "test"
@@ -56,11 +55,11 @@ def test_experiment_group():
     class Exp2Ran(Exception):
         pass
     
-    @classic.group
+    @pystematic.group
     def group(params):
         pass
 
-    @classic.parameter(
+    @pystematic.parameter(
         name="param1"
     )
     @group.experiment
@@ -68,7 +67,7 @@ def test_experiment_group():
         assert params["param1"] == "value"
         raise Exp1Ran()
 
-    @classic.parameter(
+    @pystematic.parameter(
         name="param2"
     )
     @group.experiment

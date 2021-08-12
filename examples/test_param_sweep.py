@@ -1,6 +1,6 @@
 import time
 import random
-import pystematic.classic as ps
+import pystematic as ps
 
 
 

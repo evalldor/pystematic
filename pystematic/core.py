@@ -5,7 +5,7 @@ import importlib
 import typing
 
 from . import parametric
-
+from . import pluginapi
 
 class PystematicParameterBehaviour(parametric.DefaultParameterBehaviour):
 
@@ -75,9 +75,7 @@ def Parameter(
 
 class Experiment:
 
-    def __init__(self, api_object, main_function, default_params=None, name=None, defaults_override={}, no_output_dir=False):
-        self.api_object = api_object
-        self.default_params = default_params
+    def __init__(self, main_function, name=None, defaults_override={}, no_output_dir=False):
         self.main_function = main_function
         self.name = name or main_function.__name__.lower().replace("_", "-")
         self.no_output_dir = no_output_dir
@@ -88,9 +86,7 @@ class Experiment:
             add_cli_help_option=True
         )
 
-        if self.default_params is not None:
-            for param in self.default_params:
-                self.add_parameter(param)
+        pluginapi.experiment_created(self)
 
         if hasattr(main_function, "__params_memo__"):
             for param in main_function.__params_memo__:
@@ -130,10 +126,10 @@ class Experiment:
     
     def _run_experiment(self, params):
         try:
-            self.api_object.init_experiment(self, params)
+            pluginapi.init_experiment(self, params)
             self.main_function(params)
         finally:
-            self.api_object.cleanup()
+            pluginapi.cleanup()
 
 def _run_experiment_by_name(experiment_module, experiment_name, params):
     # used by Experiment.run_in_new_process
@@ -143,7 +139,7 @@ def _run_experiment_by_name(experiment_module, experiment_name, params):
 
 class ExperimentGroup:
 
-    def __init__(self, experiment_decorator, main_function, name=None):
+    def __init__(self, main_function, name=None):
         
         self.main_function = main_function
         self.name = name or main_function.__name__.lower().replace("_", "-")
@@ -179,3 +175,151 @@ class ExperimentGroup:
             raise Exception(f"Invalid experiment name '{exp_name}'.")
 
         experiments[exp_name].cli(argv_rest)
+
+
+def parameter_decorator(
+    name: str,
+    type: typing.Callable[[str], typing.Any] = str,
+    
+    default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
+    required: bool = False,
+    allowed_values: typing.List[typing.Any] = None,
+    is_flag: bool = False,
+    multiple: bool = False,
+    allow_from_file: bool = True,
+    envvar: typing.Union[str, None, typing.Literal[False]] = None,
+
+    help: typing.Optional[str] = None,
+    default_help: typing.Optional[str] = None,
+    hidden = False,
+    behaviour = None,
+):
+    """Adds a parameter to an experiment.
+
+    Args:
+        name (str): The name of the parameter. The name must be a valid python identifier
+        type (typing.Callable[[str], typing.Any], optional): The type of the parameter. Defaults to str.
+        default (typing.Union[typing.Any, typing.Callable[[], typing.Any], None], optional): The default value of 
+            the parameter. Can be either a value or a callable. Defaults to None.
+        required (bool, optional): Set to True if this parameter is required. Defaults to False.
+        allowed_values (list[typing.Any], optional): If given, the value must be in the list of allowed values. 
+            Defaults to None.
+        is_flag (bool, optional): When set to True, this parameter is assumed 
+            to be a boolean flag. A flag parameter does not need to be given a 
+            value on the command line. Its mere presence on the command line will 
+            automatically assign it the value True. Defaults to False.
+        multiple (bool, optional): When set to True, the parameter may appear 
+            many times on the command line. It's value will be a list of values 
+            given. Defaults to False.
+        allow_from_file (bool, optional): Controls whether it should be allowed to load a value for this 
+            parameter from a params file. Defaults to True.
+        envvar (typing.Union[str, None, typing.Literal[False]], optional): Name of the environment variable. 
+            Defaults to None.
+        help (typing.Optional[str], optional): A help text for the parameter that will be 
+            shown on the command line. Defaults to None.
+        default_help (typing.Optional[str], optional): A help text for the default value. If None, the default 
+            help text will be created by calling ``str(default_value)``. Defaults to None.
+    """
+    
+    def decorator(experiment):
+
+        param = Parameter(
+            name=name,
+            type=type,
+            
+            default=default,
+            required=required,
+            allowed_values=allowed_values,
+            is_flag=is_flag,
+            multiple=multiple,
+            allow_from_file=allow_from_file,
+            envvar=envvar,
+
+            help=help,
+            default_help=default_help,
+            hidden=hidden,
+            behaviour=behaviour,
+        )
+
+        if isinstance(experiment, Experiment):
+            experiment.add_parameter(param)
+        else:
+            if not hasattr(experiment, "__params_memo__"):
+                experiment.__params_memo__ = []
+            
+            experiment.__params_memo__.append(param)
+
+        return experiment
+
+    return decorator
+
+
+def experiment_decorator(
+    name=None, 
+    inherit_params=None, 
+    defaults={}, 
+    group=None,
+    no_output_dir=False
+):
+    if callable(name):
+        main_function = name
+        name = None
+    else:
+        main_function = None
+
+    def decorator(main_function):
+        experiment = Experiment(
+            main_function=main_function, 
+            name=name, 
+            defaults_override=defaults,
+            no_output_dir=no_output_dir
+        )
+
+        existing_params = [param.name for param in experiment.get_parameters()]
+
+        if inherit_params is not None:
+            if not isinstance(inherit_params, (tuple, list)):
+                experiments_to_inherit_from = [inherit_params]
+            else:
+                experiments_to_inherit_from = inherit_params
+
+            for exp in experiments_to_inherit_from:
+                if isinstance(exp, Experiment):
+                    for param in exp.param_manager.get_parameters():
+                        if param.name not in existing_params:
+                            experiment.add_parameter(param)
+                elif callable(exp):
+                    if hasattr(exp, "__params_memo__"):
+                        for param in exp.__params_memo__:
+                            if param.name not in existing_params:
+                                experiment.add_parameter(param)
+                else:
+                    raise ValueError(f"Unknown value passed to 'inherit_params': {exp}")
+
+        if group is not None:
+            group.add_experiment(experiment)
+
+        return experiment
+
+    if main_function:
+        return decorator(main_function)
+    
+    return decorator
+
+
+def group_decorator(name=None):
+    if callable(name):
+        main_function = name
+        name = None
+    else:
+        main_function = None
+
+    def decorator(main_function):
+        group = ExperimentGroup(main_function, name=name)
+        return group
+
+    if main_function:
+        return decorator(main_function)
+    
+    return decorator
+

@@ -1,3 +1,3 @@
 
 
-from . import torch_plugin
+from .torch_plugin import TorchPlugin

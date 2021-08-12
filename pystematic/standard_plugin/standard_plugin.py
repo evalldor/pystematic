@@ -15,14 +15,27 @@ from . import yaml_wrapper as yaml
 import pystematic.core as core
 
 from pystematic.pluginapi import (
-    register_plugin, 
-    experiment_decorator, 
-    group_decorator, 
-    parameter_decorator,
-    parametric
+    PystematicPlugin
 )
 
-logger = logging.getLogger('pystematic_classic')
+from .. import parametric
+
+logger = logging.getLogger('pystematic_standard')
+
+class StandardPlugin(PystematicPlugin):
+
+    def experiment_created(self, experiment):
+        for param in standard_params:
+            experiment.add_parameter(param)
+
+    def get_api_extension(self):
+        """Returns an ApiExtension object that will be used to extend the public
+        API under the `pystematic` namespace.
+        """
+        return StandardApi()
+
+    def get_api_namespace(self):
+        return None
 
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -33,7 +46,7 @@ def _create_log_dir_name(output_dir, experiment_name):
 
     return directory
 
-class ClassicLogHandler(logging.Handler):
+class StandardLogHandler(logging.Handler):
     """Handle logging for both single- and multiprocess contexts."""
 
     def __init__(self, no_style=False):
@@ -62,7 +75,7 @@ class ClassicLogHandler(logging.Handler):
 
         self.console.print(f"{level} {name} {msg}")
 
-class ClassicApi:
+class StandardApi:
 
     def __init__(self) -> None:
         self.current_experiment = wrapt.ObjectProxy(None)
@@ -71,7 +84,7 @@ class ClassicApi:
         self.params_file: pathlib.Path = wrapt.ObjectProxy(None)
         self.random_gen: random.Random = wrapt.ObjectProxy(None)
 
-    def init_experiment(self, experiment, params):
+    def _init_experiment_(self, experiment, params):
         self.current_experiment.__wrapped__ = experiment
         self.params.__wrapped__ = params
     
@@ -80,7 +93,7 @@ class ClassicApi:
         else:
             log_level = "INFO"
 
-        logging.basicConfig(level=log_level, handlers=[ClassicLogHandler()])
+        logging.basicConfig(level=log_level, handlers=[StandardLogHandler()])
 
         if params["subprocess"]:
             logger.debug(f"Initializing subprocess...")
@@ -99,7 +112,7 @@ class ClassicApi:
 
         self.random_gen.__wrapped__ = random.Random(params["random_seed"])
 
-    def cleanup(self):
+    def _cleanup_(self):
         procs = multiprocessing.active_children()
         for proc in procs:
             try:
@@ -188,7 +201,7 @@ class ParamsFileBehaviour(parametric.DefaultParameterBehaviour):
                     result_dict.set_value_by_name(key, value)
 
 
-classic_params = [
+standard_params = [
     core.Parameter(
         name="output_dir",
         default="./output",
@@ -212,7 +225,7 @@ classic_params = [
     core.Parameter(
         name="random_seed",
         default=functools.partial(random.getrandbits, 32),
-        help="The value to seed random number generators with.",
+        help="The value to seed the master random number generator with.",
         type=int, 
         default_help="<randomly generated>"
     ),
@@ -225,10 +238,3 @@ classic_params = [
         hidden=True
     ),
 ]
-
-api_object = ClassicApi()
-api_object.parameter = parameter_decorator
-api_object.experiment = functools.partial(experiment_decorator, api_object=api_object, default_params=classic_params)
-api_object.group = functools.partial(group_decorator, experiment_decorator=api_object.experiment)
-
-register_plugin(api_object, "classic")

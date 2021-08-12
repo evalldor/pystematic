@@ -94,3 +94,6 @@ edges.
 .. - context helper methods
 .. - identical random seeds
 
+
+.. rename classic -> standard
+.. entrypoints for plugin

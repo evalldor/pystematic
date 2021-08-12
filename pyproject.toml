@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pystematic"
-version = "0.2.0"
+version = "0.3.0"
 description = "A framework that helps you setup and run reproducible experiments."
 repository = ""
 documentation = ""

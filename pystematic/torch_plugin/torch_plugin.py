@@ -1,31 +1,43 @@
 import logging
-import functools
 import pathlib
 import torch
 import tqdm
 
 from . import utils
-from ..classic_plugin import ClassicApi, classic_params
 
 from pystematic.pluginapi import (
-    register_plugin,
-    experiment_decorator, 
-    group_decorator, 
-    parameter_decorator
+    PystematicPlugin
 )
 
 from . import context, recording, torchutil
 
 import pystematic.core as core
 
+import pystematic as ps
+
+
+class TorchPlugin(PystematicPlugin):
+    
+    def experiment_created(self, experiment):
+        """Gives the plugin a chance to modify an experiment when it is created
+        """
+        for param in pytorch_params:
+            experiment.add_parameter(param)
+
+    def get_api_extension(self):
+        """Returns an ApiExtension object that will be used to extend the public
+        API under the `pystematic` namespace.
+        """
+        return TorchApi()
+
+    def get_api_namespace(self):
+        return "torch"
+
 logger = logging.getLogger('pystematic_torch')
 
-class TorchApi(ClassicApi):
-    
-    def __init__(self) -> None:
-        super().__init__()
+class TorchApi:
 
-    def init_experiment(self, experiment, params):
+    def _init_experiment_(self, experiment, params):
         if params["debug"]:
             log_level = "DEBUG"
         else:
@@ -33,9 +45,9 @@ class TorchApi(ClassicApi):
 
         logging.basicConfig(level=log_level, handlers=[utils.PytorchLogHandler()])
 
-        super().init_experiment(experiment, params)
+        
 
-        if self.params["distributed"]:
+        if ps.params["distributed"]:
             self.init_distributed()
 
     #
@@ -47,7 +59,7 @@ class TorchApi(ClassicApi):
         cuda or cpu) depending on the 'cuda' experiment parameter."""
         res = []
         for arg in args:
-            if self.params["cuda"] and callable(getattr(arg, "cuda", None)):
+            if ps.params["cuda"] and callable(getattr(arg, "cuda", None)):
                 res.append(arg.cuda())
             else:
                 res.append(arg)
@@ -71,7 +83,7 @@ class TorchApi(ClassicApi):
         """
 
         if self.is_master():
-            checkpoint_file_path = self.output_dir.joinpath(filename)
+            checkpoint_file_path = ps.output_dir.joinpath(filename)
 
             logger.info(f"Saving checkpoint '{checkpoint_file_path}'.")
 
@@ -99,16 +111,16 @@ class TorchApi(ClassicApi):
         """Initializes a distributed runtime. This function is called automatically 
         during initialization if the parameter ``distributed`` is set to ``True``.
         """
-        if self.params["local_rank"] is None:
-            for i in range(1, self.params["nproc_per_node"]):
-                self.launch_subprocess(local_rank=i)
+        if ps.params["local_rank"] is None:
+            for i in range(1, ps.params["nproc_per_node"]):
+                ps.launch_subprocess(local_rank=i)
 
             local_rank = 0
         else:
-            local_rank = self.params["local_rank"]
+            local_rank = ps.params["local_rank"]
 
-        global_rank = self.params["nproc_per_node"] * self.params["node_rank"] + local_rank
-        world_size = self.params["nproc_per_node"] * self.params["nnodes"]
+        global_rank = ps.params["nproc_per_node"] * ps.params["node_rank"] + local_rank
+        world_size = ps.params["nproc_per_node"] * ps.params["nnodes"]
 
         logger.debug(f"Initializing distributed runtime (world size '{world_size}', "
                     f"local rank '{local_rank}', global rank '{global_rank}')...")
@@ -117,7 +129,7 @@ class TorchApi(ClassicApi):
 
         torch.distributed.init_process_group(
             backend='nccl',
-            init_method=f"tcp://{self.params['master_addr']}:{self.params['master_port']}",
+            init_method=f"tcp://{ps.params['master_addr']}:{ps.params['master_port']}",
             world_size=world_size,
             rank=global_rank
         )
@@ -154,6 +166,11 @@ class TorchApi(ClassicApi):
         if torch.distributed.is_initialized():
             torch.distributed.barrier()
 
+    ContextObject = context.ContextObject
+    ContextDict = context.ContextDict
+    ContextList = context.ContextList
+    Recorder = recording.Recorder
+    BetterDataLoader = torchutil.BetterDataLoader
 
 pytorch_params = [
     core.Parameter(
@@ -228,14 +245,3 @@ pytorch_params = [
     ),
 ]
 
-api_object = TorchApi()
-api_object.parameter = parameter_decorator
-api_object.experiment = functools.partial(experiment_decorator, api_object=api_object, default_params=classic_params+pytorch_params)
-api_object.group = functools.partial(group_decorator, experiment_decorator=api_object.experiment)
-api_object.ContextObject = context.ContextObject
-api_object.ContextDict = context.ContextDict
-api_object.ContextList = context.ContextList
-api_object.Recorder = recording.Recorder
-api_object.BetterDataLoader = torchutil.BetterDataLoader
-
-register_plugin(api_object, "torch")
