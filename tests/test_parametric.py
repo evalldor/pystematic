@@ -32,11 +32,11 @@ def test_parsing():
         help="An int parameter used for testing",
         type=int
     )
-    parser.add_argument(
-        "--bool-param", 
-        help="A bool parameter used for testing",
-        action=argparse.BooleanOptionalAction
-    )
+    # parser.add_argument(
+    #     "--bool-param", 
+    #     help="A bool parameter used for testing",
+    #     action=argparse.BooleanOptionalAction
+    # )
     parser.add_argument(
         "--flag-param", 
         help="A flag parameter used for testing",

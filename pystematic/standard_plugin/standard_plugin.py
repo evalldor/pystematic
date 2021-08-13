@@ -20,22 +20,29 @@ from pystematic.pluginapi import (
 
 from .. import parametric
 
+
 logger = logging.getLogger('pystematic_standard')
 
 class StandardPlugin(PystematicPlugin):
+
+    def __init__(self) -> None:
+        self.api_object = StandardApi()
 
     def experiment_created(self, experiment):
         for param in standard_params:
             experiment.add_parameter(param)
 
-    def get_api_extension(self):
-        """Returns an ApiExtension object that will be used to extend the public
-        API under the `pystematic` namespace.
-        """
-        return StandardApi()
+    def extend_api(self, api_object):
+        for name in dir(self.api_object):
+            if not name.startswith("_"):
+                setattr(api_object, name, getattr(self.api_object, name))
 
-    def get_api_namespace(self):
-        return None
+    def before_experiment(self, experiment, params):
+        self.api_object._before_experiment(experiment, params)
+
+    def after_experiment(self):
+        self.api_object._after_experiment()
+
 
 def _create_log_dir_name(output_dir, experiment_name):
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -47,7 +54,6 @@ def _create_log_dir_name(output_dir, experiment_name):
     return directory
 
 class StandardLogHandler(logging.Handler):
-    """Handle logging for both single- and multiprocess contexts."""
 
     def __init__(self, no_style=False):
         super().__init__()
@@ -56,8 +62,7 @@ class StandardLogHandler(logging.Handler):
             'info':     'blue',
             'warning':  'yellow',
             'error':    'red',
-            'rank': "green",
-            'name': "green"
+            'name':     "green"
 
         }, inherit=False)
 
@@ -84,7 +89,7 @@ class StandardApi:
         self.params_file: pathlib.Path = wrapt.ObjectProxy(None)
         self.random_gen: random.Random = wrapt.ObjectProxy(None)
 
-    def _init_experiment_(self, experiment, params):
+    def _before_experiment(self, experiment, params):
         self.current_experiment.__wrapped__ = experiment
         self.params.__wrapped__ = params
     
@@ -112,7 +117,7 @@ class StandardApi:
 
         self.random_gen.__wrapped__ = random.Random(params["random_seed"])
 
-    def _cleanup_(self):
+    def _after_experiment(self):
         procs = multiprocessing.active_children()
         for proc in procs:
             try:

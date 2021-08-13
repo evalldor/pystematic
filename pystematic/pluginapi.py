@@ -1,5 +1,4 @@
 all_plugins = []
-api_objects = []
 
 def load_all_plugins():
     from .standard_plugin import StandardPlugin
@@ -11,26 +10,14 @@ def load_all_plugins():
     torch_plugin = TorchPlugin()
     all_plugins.append(torch_plugin)
 
-class Tmp:
+class ApiTemplate:
     pass
 
-def construct_api_extension():
-    obj = Tmp()
+def construct_api():
+    obj = ApiTemplate()
     for plugin in all_plugins:
-        api_object = plugin.get_api_extension()
-        api_objects.append(api_object)
-        namespace = plugin.get_api_namespace()
+        plugin.extend_api(obj)
 
-        if namespace is None:
-            object_to_extend = obj
-        else:
-            setattr(obj, namespace, Tmp())
-            object_to_extend = getattr(obj, namespace)
-
-        for name in dir(api_object):
-            if not name.startswith("_"):
-                setattr(object_to_extend, name, getattr(api_object, name))
-    
     return obj
 
 def experiment_created(experiment):
@@ -38,14 +25,12 @@ def experiment_created(experiment):
         plugin.experiment_created(experiment)
 
 def init_experiment(experiment, params):
-    for api_object in api_objects:
-        if hasattr(api_object, "_init_experiment_"):
-            api_object._init_experiment_(experiment, params)
+    for plugin in all_plugins:
+        plugin.before_experiment(experiment, params)
 
 def cleanup():
-    for api_object in api_objects:
-        if hasattr(api_object, "_cleanup_"):
-            api_object._cleanup_()
+    for plugin in all_plugins:
+        plugin.after_experiment()
 
 
 class PystematicPlugin:
@@ -55,11 +40,21 @@ class PystematicPlugin:
         """
         pass
 
-    def get_api_extension(self):
-        """Returns an ApiExtension object that will be used to extend the public
-        API under the `pystematic` namespace.
+    def extend_api(self, api_object):
+        """Gives the plugin a chance to modify the pystematic API.
         """
         pass
 
-    def get_api_namespace(self):
+    def before_experiment(self, experiment, params):
+        """Called before the main function of the experiment is executed.
+
+        Args:
+            experiment (Experiment): A handle to the experiment object.
+            params (dict): Contains the values assigned to the parameters of the experiment.
+        """
+        pass
+
+    def after_experiment(self):
+        """Called after the experiment main function has returned. 
+        """
         pass

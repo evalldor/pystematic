@@ -15,8 +15,12 @@ import pystematic.core as core
 
 import pystematic as ps
 
+logger = logging.getLogger('pystematic_torch')
 
 class TorchPlugin(PystematicPlugin):
+
+    def __init__(self) -> None:
+        self.api_object = TorchApi()
     
     def experiment_created(self, experiment):
         """Gives the plugin a chance to modify an experiment when it is created
@@ -24,35 +28,28 @@ class TorchPlugin(PystematicPlugin):
         for param in pytorch_params:
             experiment.add_parameter(param)
 
-    def get_api_extension(self):
-        """Returns an ApiExtension object that will be used to extend the public
-        API under the `pystematic` namespace.
-        """
-        return TorchApi()
+    def extend_api(self, api_object):
+        setattr(api_object, "torch", self.api_object)
 
-    def get_api_namespace(self):
-        return "torch"
+    def before_experiment(self, experiment, params):
+        self.api_object._before_experiment(experiment, params)
 
-logger = logging.getLogger('pystematic_torch')
+    def after_experiment(self):
+        pass
+
 
 class TorchApi:
 
-    def _init_experiment_(self, experiment, params):
+    def _before_experiment(self, experiment, params):
         if params["debug"]:
             log_level = "DEBUG"
         else:
             log_level = "INFO"
 
-        logging.basicConfig(level=log_level, handlers=[utils.PytorchLogHandler()])
-
+        logging.basicConfig(level=log_level, handlers=[utils.PytorchLogHandler()], force=True)
         
-
-        if ps.params["distributed"]:
+        if params["distributed"]:
             self.init_distributed()
-
-    #
-    # Helpers
-    #
 
     def place_on_correct_device(self, *args):
         """Utility method to place a batch of data on the correct device (i.e.

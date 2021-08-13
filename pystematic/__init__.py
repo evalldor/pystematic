@@ -6,7 +6,7 @@ from . import core as _core
 
 _pluginapi.load_all_plugins()
 
-_api_object = _pluginapi.construct_api_extension()
+_api_object = _pluginapi.construct_api()
 
 for name in dir(_api_object):
     if not name.startswith("_"):
