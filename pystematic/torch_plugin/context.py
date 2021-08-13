@@ -36,7 +36,7 @@ class TorchContext:
         raise NotImplementedError()
 
     def autotransform(self):
-        from pystematic.torch import params
+        from pystematic import params
         if params["checkpoint"]:
             logger.info(f"Loading checkpoint '{params['checkpoint']}'.")
             with open(params["checkpoint"], "rb") as f:

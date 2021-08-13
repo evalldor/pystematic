@@ -36,7 +36,7 @@ class Recorder:
         self._counter = 0
 
         if output_dir is None:
-            from pystematic import torch as pst
+            import pystematic as pst
             output_dir = pst.output_dir
             
         self._output_dir = output_dir
