@@ -7,10 +7,10 @@ logger = logging.getLogger('pystematic_torchcontext')
 
 class TorchContext:
     """A context object is like a big container that holds all pytorch related
-    objects you need. Its main use is to allow a pytorch session so transition
+    objects you need. Its main use is to allow a pytorch session to transition
     seamlessly between different modes (e.g. distributed, cuda) based on
     experiment parameters. It does this by transparently transforming some
-    object that you add. For example, when running in distributed mode, all
+    objects that you add. For example, when running in distributed mode, all
     pytorch models added to this context will be automatically wrapped in 
     torch's :obj:`DistributedDataParallel`.
 
