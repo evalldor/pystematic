@@ -1,16 +1,23 @@
-"""parametric: advanced parameter and args handling
+"""Parametric: next generation argument parsing and parameter handling
 
-clear cut stages:
+Handles all possible sources of parameter values:
+- cli
+- dict
+- env
+- defaults
+
+Clear cut, interceptable stages:
 - cli parsing
 - envvar extraction
 - defaults insertion
 - value validation
 
-param sources:
-- cli
-- dict
-- env
-- defaults
+
+Motivation: 
+
+A number of shortcommings in existing argparsing libs motivated the creation of
+this lib. More specifically; handling many different sources of parameter
+values, custom help text formatting, extensibility. 
 """
 
 

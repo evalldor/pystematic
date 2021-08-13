@@ -313,7 +313,7 @@ class ContextList(TorchContext):
         Returns:
             dict: A dict that maps names to state_dicts
         """
-        list_with_state = {}
+        list_with_state = []
 
         for i, item in enumerate(self._items):
             list_with_state.append(self._get_state_dict(item))
