@@ -5,7 +5,7 @@ Main features:
 
 * Standardizes how experiments and associated parameters are defined.
   
-* Provides both CLI and programmatic interfaces for runnning your experiments.
+* Provides both CLI and programmatic interfaces for running your experiments.
   
 * Encourages reproducibility by isolating experiment outputs and providing
   tools for managing random seeds.
@@ -39,7 +39,7 @@ Experiments and parameters are defined with decorators. The following example
 defines an experiment named ``example_experiment`` with two parameters,
 ``string_param`` and ``int_param``:
 
-.. code-block:: 
+.. code-block:: python
 
     import pystematic
     
@@ -63,7 +63,7 @@ defines an experiment named ``example_experiment`` with two parameters,
 You can run the experiment either by supplying a dict containing the values for
 the parameters:
 
-.. code-block:: 
+.. code-block:: python
 
     example_experiment.run({
         "string_param": "hello",
@@ -72,7 +72,7 @@ the parameters:
 
 Or you can run the experiment from the command line:
 
-.. code-block:: 
+.. code-block:: python
 
     if __name__ == "__main__":
         example_experiment.cli()

@@ -4,11 +4,11 @@ API documentation
 Decorators
 ----------
 
-.. autodecorator:: pystematic.torch.experiment(name=None, inherit_params=None, defaults={}, group=None)
+.. autodecorator:: pystematic.experiment(name=None, inherit_params=None, defaults={}, group=None)
 
-.. autodecorator:: pystematic.torch.parameter
+.. autodecorator:: pystematic.parameter
 
-.. autofunction:: pystematic.torch.group(name=None)
+.. autofunction:: pystematic.group(name=None)
 
 
 Experiment API
@@ -21,7 +21,7 @@ Global attributes
 These attributes holds information related to the current experiment. Note that
 they are uninitialized until an experiment has actually started.
 
-.. autodata:: pystematic.torch.output_dir
+.. autodata:: pystematic.output_dir
     :annotation: : pathlib.Path
 
     Holds a :code:`pathlib.Path` object that points to the current output
@@ -31,7 +31,7 @@ they are uninitialized until an experiment has actually started.
     yourself, it is your responsibly to use this output directory.
 
 
-.. autodata:: pystematic.torch.params 
+.. autodata:: pystematic.params 
     :annotation: : dict
 
     Holds a dict of all parameters of the current experiment.
@@ -41,13 +41,13 @@ they are uninitialized until an experiment has actually started.
 General
 +++++++
 
-.. autofunction:: pystematic.torch.new_seed
+.. autofunction:: pystematic.new_seed
+
+.. autofunction:: pystematic.launch_subprocess
+
+.. autofunction:: pystematic.is_subprocess
 
 .. autofunction:: pystematic.torch.run_parameter_sweep
-
-.. autofunction:: pystematic.torch.launch_subprocess
-
-.. autofunction:: pystematic.torch.is_subprocess
 
 
 Distributed

@@ -1,4 +1,4 @@
-import pystematic.classic as ps
+import pystematic as ps
 
 @ps.experiment
 def my_experiment(params):

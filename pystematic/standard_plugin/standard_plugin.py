@@ -175,12 +175,20 @@ class StandardApi:
 
         return self.current_experiment.run_in_new_process(subprocess_params)
 
+    def run_parameter_sweep(self, experiment, list_of_params, max_num_processes=1) -> None:
+        """Runs an experiment with a set of different params. At most
+        :obj:`max_num_processes` concurrent processes will be used.
+        """
+        pool = ProcessQueue(max_num_processes)
+        pool.run_and_wait_for_completion(experiment, list_of_params)
+
     def is_subprocess(self) -> bool:
         """Returns true if this process is a subprocess. I.e. it has been
         launched by a call to :func:`launch_subprocess` in a parent process.
         """
 
         return self.params["subprocess"] is not None
+
 
 class ParamsFileBehaviour(parametric.DefaultParameterBehaviour):
     
@@ -242,3 +250,37 @@ standard_params = [
         hidden=True
     ),
 ]
+
+
+class ProcessQueue:
+
+    def __init__(self, num_processes):
+        self._mp_context = multiprocessing.get_context('spawn')
+        self._num_processes = num_processes
+        self._live_processes = []
+
+    def _wait(self):
+        sentinels = [proc.sentinel for proc in self._live_processes]
+        finished_sentinels = multiprocessing.connection.wait(sentinels)
+
+        completed_procs = []
+        
+        for proc in self._live_processes:
+            if proc.sentinel in finished_sentinels:
+                completed_procs.append(proc)
+
+        for proc in completed_procs:
+            self._live_processes.remove(proc)
+
+    def run_and_wait_for_completion(self, experiment, list_of_params):
+
+        for params in list_of_params:
+
+            while len(self._live_processes) >= self._num_processes:
+                self._wait()
+            
+            proc = experiment.run_in_new_process(params)
+            self._live_processes.append(proc)
+            
+        while len(self._live_processes) > 0:
+            self._wait()
