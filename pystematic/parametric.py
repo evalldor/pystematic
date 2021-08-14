@@ -18,6 +18,12 @@ Motivation:
 A number of shortcommings in existing argparsing libs motivated the creation of
 this lib. More specifically; handling many different sources of parameter
 values, custom help text formatting, extensibility. 
+
+
+Usage:
+
+The main use of this lib is through (an instance of) the ParameterManager class.
+It allows you to define parameters as well as read them from various sources.
 """
 
 

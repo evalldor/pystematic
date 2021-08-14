@@ -3,9 +3,66 @@ import functools
 import multiprocessing
 import importlib
 import typing
+import importlib.metadata
+import logging
 
 from . import parametric
-from . import pluginapi
+
+logger = logging.getLogger("pystematic.core")
+
+class PystematicApp:
+
+    def __init__(self) -> None:
+        self._loaded_plugins = []
+
+        self._experiment_created_callbacks = []
+        self._before_experiment_callbacks = []
+        self._after_experiment_callbacks = []
+        
+    def get_api_object(self):
+        import pystematic
+        return pystematic
+
+    def load_all_plugins(self):
+        # from .standard_plugin import StandardPlugin      
+        # self._loaded_plugins.append(StandardPlugin(self))
+
+        all_entry_points = importlib.metadata.entry_points()
+
+        if "pystematic.plugins" in all_entry_points:
+            
+            for entry_point in all_entry_points["pystematic.plugins"]:
+                logger.info(f"Loading plugin '{entry_point.name}'.")
+                plugin = entry_point.load()
+                self._loaded_plugins.append(plugin(self))
+
+    def on_experiment_created(self, callback):
+        self._experiment_created_callbacks.append(callback)
+
+    def on_before_experiment(self, callback):
+        self._before_experiment_callbacks.append(callback)
+
+    def on_after_experiment(self, callback):
+        self._after_experiment_callbacks.append(callback)
+
+
+    def experiment_created(self, experiment):
+        for callback in self._experiment_created_callbacks:
+            experiment = callback(experiment)
+        
+        return experiment
+
+    def before_experiment(self, experiment, params):
+        for callback in self._before_experiment_callbacks:
+            callback(experiment, params)
+
+    def after_experiment(self):
+        for callback in self._after_experiment_callbacks:
+            callback()
+
+
+app = PystematicApp()
+
 
 class PystematicParameterBehaviour(parametric.DefaultParameterBehaviour):
 
@@ -86,12 +143,6 @@ class Experiment:
             add_cli_help_option=True
         )
 
-        pluginapi.experiment_created(self)
-
-        if hasattr(main_function, "__params_memo__"):
-            for param in main_function.__params_memo__:
-                self.add_parameter(param)
-
     def add_parameter(self, param):
         self.param_manager.add_parameter(param)
 
@@ -126,10 +177,11 @@ class Experiment:
     
     def _run_experiment(self, params):
         try:
-            pluginapi.init_experiment(self, params)
+            app.before_experiment(self, params)
             self.main_function(params)
         finally:
-            pluginapi.cleanup()
+            app.after_experiment()
+
 
 def _run_experiment_by_name(experiment_module, experiment_name, params):
     # used by Experiment.run_in_new_process
@@ -275,6 +327,12 @@ def experiment_decorator(
             no_output_dir=no_output_dir
         )
 
+        experiment = app.experiment_created(experiment)
+
+        if hasattr(main_function, "__params_memo__"):
+            for param in main_function.__params_memo__:
+                experiment.add_parameter(param)
+
         existing_params = [param.name for param in experiment.get_parameters()]
 
         if inherit_params is not None:
@@ -323,3 +381,29 @@ def group_decorator(name=None):
     
     return decorator
 
+
+class PystematicPlugin:
+
+    def experiment_created(self, experiment):
+        """Gives the plugin a chance to modify an experiment when it is created
+        """
+        pass
+
+    def extend_api(self, api_object):
+        """Gives the plugin a chance to modify the pystematic API.
+        """
+        pass
+
+    def before_experiment(self, experiment, params):
+        """Called before the main function of the experiment is executed.
+
+        Args:
+            experiment (Experiment): A handle to the experiment object.
+            params (dict): Contains the values assigned to the parameters of the experiment.
+        """
+        pass
+
+    def after_experiment(self):
+        """Called after the experiment main function has returned. 
+        """
+        pass

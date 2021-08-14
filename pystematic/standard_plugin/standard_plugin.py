@@ -14,34 +14,33 @@ from rich.markup import escape
 from . import yaml_wrapper as yaml
 import pystematic.core as core
 
-from pystematic.pluginapi import (
-    PystematicPlugin
-)
-
 from .. import parametric
 
 
-logger = logging.getLogger('pystematic_standard')
+logger = logging.getLogger('pystematic.standard')
 
-class StandardPlugin(PystematicPlugin):
+class StandardPlugin:
 
-    def __init__(self) -> None:
+    def __init__(self, app) -> None:
         self.api_object = StandardApi()
+
+        app.on_experiment_created(self.experiment_created)
+        app.on_before_experiment(self.api_object._before_experiment)
+        app.on_after_experiment(self.api_object._after_experiment)
+
+        self.extend_api(app.get_api_object())
+
 
     def experiment_created(self, experiment):
         for param in standard_params:
             experiment.add_parameter(param)
+        
+        return experiment
 
     def extend_api(self, api_object):
         for name in dir(self.api_object):
             if not name.startswith("_"):
                 setattr(api_object, name, getattr(self.api_object, name))
-
-    def before_experiment(self, experiment, params):
-        self.api_object._before_experiment(experiment, params)
-
-    def after_experiment(self):
-        self.api_object._after_experiment()
 
 
 def _create_log_dir_name(output_dir, experiment_name):

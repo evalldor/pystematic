@@ -78,7 +78,7 @@ Or you can run the experiment from the command line:
         example_experiment.cli()
 
 
-And then from the terminal:
+and then from the terminal:
 
 .. code-block:: 
 
@@ -89,7 +89,7 @@ Documentation
 
 Full documentation is available at ???.
 
-Note that this project is still in the early stages. There may be some rough
+Note that this project is still in the early stages. You may encounter rough
 edges.
 
 
@@ -128,6 +128,3 @@ edges.
 .. - context helper methods
 .. - identical random seeds
 
-
-.. rename classic -> standard
-.. entrypoints for plugin

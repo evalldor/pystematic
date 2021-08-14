@@ -5,37 +5,36 @@ import tqdm
 
 from . import utils
 
-from pystematic.pluginapi import (
-    PystematicPlugin
-)
-
 from . import context, recording, torchutil
 
 import pystematic.core as core
 
 import pystematic as ps
 
-logger = logging.getLogger('pystematic_torch')
+logger = logging.getLogger('pystematic.torch')
 
-class TorchPlugin(PystematicPlugin):
+class TorchPlugin(core.PystematicPlugin):
 
-    def __init__(self) -> None:
+    def __init__(self, app) -> None:
         self.api_object = TorchApi()
+
+        app.on_experiment_created(self.experiment_created)
+        app.on_before_experiment(self.api_object._before_experiment)
+       
+
+        self.extend_api(app.get_api_object())
     
     def experiment_created(self, experiment):
         """Gives the plugin a chance to modify an experiment when it is created
         """
         for param in pytorch_params:
             experiment.add_parameter(param)
+        
+        return experiment
 
     def extend_api(self, api_object):
         setattr(api_object, "torch", self.api_object)
 
-    def before_experiment(self, experiment, params):
-        self.api_object._before_experiment(experiment, params)
-
-    def after_experiment(self):
-        pass
 
 
 class TorchApi:

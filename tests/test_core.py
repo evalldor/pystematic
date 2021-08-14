@@ -1,7 +1,6 @@
 import pytest
-
 import pystematic
-
+from pystematic import output_dir
 
 def test_main_function_is_run():
 
@@ -81,3 +80,18 @@ def test_experiment_group():
     with pytest.raises(Exp2Ran):
         group.cli(["exp2", "--param2", "value"])
 
+
+def test_output_dir_works():
+
+    class CustomException(Exception):
+        pass
+
+    @pystematic.experiment
+    def output_exp(params):
+        with output_dir.joinpath("testfile.txt").open("w") as f:
+            f.write("hello")
+
+        raise CustomException()
+
+    with pytest.raises(CustomException):
+        output_exp.run({})
