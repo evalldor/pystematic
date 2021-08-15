@@ -282,7 +282,7 @@ def parameter_decorator(
     """Adds a parameter to an experiment.
 
     Args:
-        name (str): The name of the parameter. The name must be a valid python identifier
+        name (str): The name of the parameter. The name must be a valid python identifier.
         type (typing.Callable[[str], typing.Any], optional): The type of the parameter. Defaults to str.
         default (typing.Union[typing.Any, typing.Callable[[], typing.Any], None], optional): The default value of 
             the parameter. Can be either a value or a callable. Defaults to None.
@@ -348,7 +348,7 @@ def experiment_decorator(
     """Creates a new experiment with the decorated function as the main function.
 
     Args:
-        name (str, optional): Name name of the experiment. Defaults to the name of the main function.
+        name (str, optional): Name of the experiment. Defaults to the name of the main function.
         inherit_params (Experiment, List[Experiment], optional): An experiment, or a list of experiments 
             to inherit parameters from. Defaults to None.
         defaults (dict, optional): A dict containing default values for parameters, will override any 

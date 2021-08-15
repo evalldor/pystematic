@@ -87,7 +87,7 @@ and then from the terminal:
 Documentation
 -------------
 
-Full documentation is available at ???.
+Full documentation is available at `<https://pystematic.readthedocs.io>`_.
 
 Note that this project is still in the early stages. You may encounter rough
 edges.
