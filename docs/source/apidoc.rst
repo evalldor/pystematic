@@ -10,10 +10,22 @@ Decorators
 
 .. autofunction:: pystematic.group(name=None)
 
+Core
+----
+
+These classes are not used manually, but created by their corresponding decorators.
+
+.. autoclass:: pystematic.core.Experiment
+    :members: add_parameter, get_parameters, run, cli, run_in_new_process
+    :undoc-members:
+
+.. autoclass:: pystematic.core.ExperimentGroup
 
 Experiment API
 --------------
 
+The experiment API is available for the currently running experiment. The use of
+the API when no experiment is running results in undefined behavior. 
 
 Global attributes
 +++++++++++++++++
@@ -38,70 +50,13 @@ they are uninitialized until an experiment has actually started.
 
 
 
-General
-+++++++
+Functions
++++++++++
 
 .. autofunction:: pystematic.new_seed
 
 .. autofunction:: pystematic.launch_subprocess
 
+.. autofunction:: pystematic.run_parameter_sweep
+
 .. autofunction:: pystematic.is_subprocess
-
-.. autofunction:: pystematic.torch.run_parameter_sweep
-
-
-Distributed
-+++++++++++
-
-.. autofunction:: pystematic.torch.init_distributed
-
-.. autofunction:: pystematic.torch.is_distributed
-
-.. autofunction:: pystematic.torch.is_master
-
-.. autofunction:: pystematic.torch.get_num_processes
-
-.. autofunction:: pystematic.torch.get_rank
-
-.. autofunction:: pystematic.torch.distributed_barrier
-
-
-Checkpoints
-+++++++++++
-
-.. autofunction:: pystematic.torch.save_checkpoint
-
-.. autofunction:: pystematic.torch.load_checkpoint
-
-
-Recording
----------
-
-.. autoclass:: pystematic.torch.Recorder
-
-    .. autoproperty:: count
-
-    .. automethod:: step
-    
-    .. automethod:: scalar
-
-    .. automethod:: image
-
-    .. automethod:: figure
-
-    .. automethod:: state_dict
-
-    .. automethod:: load_state_dict
-
-
-Torch context
--------------
-    
-.. autoclass:: pystematic.torch.ContextObject
-
-    
-Components
-----------
-
-.. autoclass:: pystematic.torch.BetterDataLoader
-

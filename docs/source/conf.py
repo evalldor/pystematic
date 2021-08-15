@@ -18,8 +18,8 @@ import sys
 # -- Project information -----------------------------------------------------
 
 project = 'pystematic'
-copyright = '2021, E.V'
-author = 'E.V'
+copyright = '2021'
+author = 'E.Valldor'
 
 
 # -- General configuration ---------------------------------------------------

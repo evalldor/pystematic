@@ -131,11 +131,13 @@ def Parameter(
 
 
 class Experiment:
+    """This is the class used to represent experiments. Note that you should not
+    instantiate this class manually, but only through the :func:`pystematic.experiment` decorator.
+    """ 
 
-    def __init__(self, main_function, name=None, defaults_override={}, no_output_dir=False):
+    def __init__(self, main_function, name=None, defaults_override={}):
         self.main_function = main_function
         self.name = name or main_function.__name__.lower().replace("_", "-")
-        self.no_output_dir = no_output_dir
         self._defaults_override = defaults_override
         
         self.param_manager = parametric.ParameterManager(
@@ -144,19 +146,38 @@ class Experiment:
         )
 
     def add_parameter(self, param):
+        """Adds a parameter to the experiment. Usually not used directly, but
+        via the :func:`pystematic.parameter` decorator.
+
+        Args:
+            param (Parameter): The parameter to add.
+        """
         self.param_manager.add_parameter(param)
 
     def get_parameters(self):
+        """Returns a list of all parameters registered with this experiment.
+        """
         return self.param_manager.get_parameters()
 
     def __call__(self, params):
         return self.run(params)
 
     def run(self, params):
+        """Runs the experiment in the current process with the parameters provided.
+
+        Args:
+            params (dict): A dict containing the values for the parameters.
+        """
         param_values = self.param_manager.from_dict(params)
         self._run_experiment(param_values)
 
     def cli(self, argv=None):
+        """Runs the experiment by parsing the parameters from the command line.
+
+        Args:
+            argv (List[str], optional): A list of command line arguments. If None, will use 
+                ``sys.argv``. Defaults to None.
+        """
         if argv is None:
             argv = sys.argv[1:]
 
@@ -164,6 +185,17 @@ class Experiment:
         self._run_experiment(param_values)
 
     def run_in_new_process(self, params):
+        """Runs the experiment in a new process with the parameters provided.
+        Returns a handle to the process object used to run the experiment. If
+        you want to wait for the experiment to finish you have to manually wait
+        on the process to exit.
+
+        Args:
+            params (dict): A dict containing the values for the parameters.
+
+        Returns:
+            multiprocessing.Process: The process object used to run the experiment
+        """
         # We run the experiment like this to avoid pickling problems
         module = self.main_function.__module__
         name = self.main_function.__name__
@@ -190,7 +222,8 @@ def _run_experiment_by_name(experiment_module, experiment_name, params):
 
 
 class ExperimentGroup:
-
+    """Use when you have many experiments and want to group them in some way.
+    """
     def __init__(self, main_function, name=None):
         
         self.main_function = main_function
@@ -310,9 +343,20 @@ def experiment_decorator(
     name=None, 
     inherit_params=None, 
     defaults={}, 
-    group=None,
-    no_output_dir=False
+    group=None
 ):
+    """Creates a new experiment with the decorated function as the main function.
+
+    Args:
+        name (str, optional): Name name of the experiment. Defaults to the name of the main function.
+        inherit_params (Experiment, List[Experiment], optional): An experiment, or a list of experiments 
+            to inherit parameters from. Defaults to None.
+        defaults (dict, optional): A dict containing default values for parameters, will override any 
+            default set in the parameter declaration. Defaults to {}.
+        group (ExperimentGroup, optional): A group that this experiment should belong to. Typically not set manually, 
+            but through the group decorator. Defaults to None.
+
+    """
     if callable(name):
         main_function = name
         name = None
@@ -323,8 +367,7 @@ def experiment_decorator(
         experiment = Experiment(
             main_function=main_function, 
             name=name, 
-            defaults_override=defaults,
-            no_output_dir=no_output_dir
+            defaults_override=defaults
         )
 
         experiment = app.experiment_created(experiment)
@@ -366,6 +409,11 @@ def experiment_decorator(
 
 
 def group_decorator(name=None):
+    """Used to group experiments. This decorator is used on a function.
+
+    Args:
+        name (str, optional): The name of the group. Defaults to None.
+    """
     if callable(name):
         main_function = name
         name = None
