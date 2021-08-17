@@ -13,6 +13,7 @@ Main features:
 * Encourages reproducibility by isolating experiment outputs and providing
   tools for managing random seeds.
 
+Source code is on `github <https://github.com/evalldor/pystematic>`_.
 
 Quickstart
 ==========

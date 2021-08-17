@@ -9,7 +9,7 @@ consists of:
 
 #. A **main function** that executes the code associated with the experiment,
 
-#. and a set of **parameters**, that controls some aspects of the experiments
+#. a set of **parameters**, that controls aspects of the experiments
    behavior.
 
 To define an experiment you simply decorate the main function of
@@ -66,9 +66,10 @@ Every experiment has a set of parameters associated with it. If you run:
 
    $ python path/to/file.py -h
 
-you will see that the experiment we defined earlier is already equipped with a set of
-default parameters. To add additional parameters to the experiment, you use the
-:func:`pystematic.parameter` decorator:
+you will see that the experiment we defined earlier is already equipped with a
+set of :ref:`default parameters <apidoc:default parameters>`. To add additional
+parameters to the experiment, you use the :func:`pystematic.parameter`
+decorator:
 
 .. code-block:: python
 
@@ -145,3 +146,31 @@ generator to generate a new number every time it is called. This way, you make
 the experiment reproducible by controlling all sources of randomness in the
 experiment with the single "global" seed provided in the ``random_seed``
 parameter. 
+
+Here's how a simple experiment might make sure that random numbers are
+reproducible:
+
+.. code-block:: python
+
+   import random
+
+   import numpy as np
+   import pystematic as ps
+
+
+   @ps.experiment
+   def reproducible_experiment(params):
+      random.seed(ps.new_seed())
+      np.random.seed(ps.new_seed())
+      # etc.
+
+
+Grouping experiments
+--------------------
+
+
+
+Extensions
+----------
+
+To be continued

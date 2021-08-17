@@ -1,5 +1,5 @@
-API documentation
-=================
+API reference
+=============
 
 Decorators
 ----------
@@ -10,10 +10,11 @@ Decorators
 
 .. autofunction:: pystematic.group(name=None)
 
-Core
-----
+Experiment classes
+------------------
 
-These classes are not used manually, but created by their corresponding decorators.
+These classes are not supposed to be instantiated manually, but only through
+their corresponding decorators.
 
 .. autoclass:: pystematic.core.Experiment
     :members: add_parameter, get_parameters, run, cli, run_in_new_process
@@ -46,8 +47,9 @@ they are uninitialized until an experiment has actually started.
 .. autodata:: pystematic.params 
     :annotation: : dict
 
-    Holds a dict of all parameters of the current experiment.
-
+    Holds a dict of all parameters of the current experiment. It is the same
+    dict that is passed to the main function. **You should never modify this
+    dict.**
 
 
 Functions
@@ -60,3 +62,25 @@ Functions
 .. autofunction:: pystematic.run_parameter_sweep
 
 .. autofunction:: pystematic.is_subprocess
+
+
+Default parameters
+------------------
+
+The following parameters are added to all experiments by default. Note that
+these are also listed if you run an experiment from the command line with the
+``--help`` option.
+
+* ``output_dir``: Parent directory to store all run-logs in. Will be created if
+  it does not exist. Default value is ``./output``. 
+
+* ``random_seed``: The value to seed the master random number generator with.
+  Default is randomly generated.
+
+* ``params_file``: Read experiment parameters from a yaml file, such as the one
+  dumped in the output dir from an eariler run. When this option is set from the
+  command line, any other options supplied after will override the ones
+  loaded from the file.
+
+* ``debug``: Sets debug flag ON/OFF. Configures the python logging mechanism to
+  print all DEBUG messages. Default value is ``False``.

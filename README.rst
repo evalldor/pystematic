@@ -10,6 +10,7 @@ Main features:
 * Encourages reproducibility by isolating experiment outputs and providing
   tools for managing random seeds.
 
+
 Quickstart
 ----------
 
@@ -18,14 +19,14 @@ Installation
 
 pystematic is available on pypi, and can be installed with your package manager of choice.
 
-If using pypoetry:
+If using poetry:
 
 .. code-block:: 
 
     $ poetry add pystematic
 
     
-Or just pip:
+or just pip:
 
 .. code-block:: 
 
@@ -84,10 +85,29 @@ and then from the terminal:
 
     $ python path/to/file.py --string-param hello --int-param 10
 
+
+Extensions
+----------
+
+For running machine learning experiments in pytorch check out the
+`pystematic-torch <https://github.com/evalldor/pystematic-torch>`_ plugin.
+
+
 Documentation
 -------------
 
 Full documentation is available at `<https://pystematic.readthedocs.io>`_.
 
-Note that this project is still in the early stages. You may encounter rough
-edges.
+
+Related tools
+-------------
+
+Other related tools that might interest you:
+
+* `Aim <https://github.com/aimhubio/aim>`_: record, search and compare 1000s of
+  ML training runs.
+
+* `Hydra <https://github.com/facebookresearch/hydra>`_: a framework for elegantly
+  configuring complex applications.
+
+* `MLflow <https://github.com/mlflow/mlflow>`: a machine learning lifecycle platform.

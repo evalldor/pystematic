@@ -6,6 +6,7 @@ import multiprocessing
 import datetime
 import string
 import functools
+import inspect
 
 from rich.console import Console
 from rich.theme import Theme
@@ -135,14 +136,6 @@ class StandardApi:
         generators.
         """
         return self.random_gen.getrandbits(nbits)
-
-    def seed_known_random_generators(self) -> None:
-        """This is just a helper to seed all known random modules with
-        reproducible seeds."""
-
-        logger.info(f"Seeding python random module")
-
-        random.seed(self.new_seed())
     
     def launch_subprocess(self, **additional_params) -> multiprocessing.Process:
         """Launches a subprocess. The subprocess will have the same output
@@ -160,6 +153,7 @@ class StandardApi:
             should pass a new seed to this function in the ``random_seed`` parameter. 
 
             E.g.:
+            
             >>> pystematic.launch_subprocess(random_seed=pystematic.new_seed())
 
         """
@@ -222,14 +216,19 @@ standard_params = [
     core.Parameter(
         name="debug",
         default=False,
-        help="Sets debug flag on/off.",
+        help="Sets debug flag on/off. Configures the python logging mechanism to print all DEBUG messages.",
         type=bool,
         is_flag=True
     ),
     core.Parameter(
         name="params_file",
         type=pathlib.Path,
-        help="Read experiment parameters from FILE.",
+        help=inspect.cleandoc(
+            """Read experiment parameters from a yaml file, such as the one
+            dumped in the output dir from an eariler run. When this option is
+            set from the command line, any other options supplied AFTER this one
+            will override the ones loaded from the file."""
+        ),
         behaviour=ParamsFileBehaviour(),
         allow_from_file=False
     ),
