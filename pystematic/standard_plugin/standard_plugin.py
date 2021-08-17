@@ -25,9 +25,9 @@ class StandardPlugin:
     def __init__(self, app) -> None:
         self.api_object = StandardApi()
 
-        app.on_experiment_created(self.experiment_created)
-        app.on_before_experiment(self.api_object._before_experiment)
-        app.on_after_experiment(self.api_object._after_experiment)
+        app.on_experiment_created(self.experiment_created, priority=10)
+        app.on_before_experiment(self.api_object._before_experiment, priority=10)
+        app.on_after_experiment(self.api_object._after_experiment, priority=10)
 
         self.extend_api(app.get_api_object())
 

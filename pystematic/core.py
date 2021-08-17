@@ -24,8 +24,9 @@ class PystematicApp:
         return pystematic
 
     def load_all_plugins(self):
-        # from .standard_plugin import StandardPlugin      
-        # self._loaded_plugins.append(StandardPlugin(self))
+        """Finds and loads all plugins by searching entry points under the
+        ``pystematic.plugins`` namespace.
+        """
 
         all_entry_points = importlib.metadata.entry_points()
 
@@ -36,28 +37,28 @@ class PystematicApp:
                 plugin = entry_point.load()
                 self._loaded_plugins.append(plugin(self))
 
-    def on_experiment_created(self, callback):
-        self._experiment_created_callbacks.append(callback)
+    def on_experiment_created(self, callback, priority=50):
+        self._experiment_created_callbacks.append((callback, priority))
 
-    def on_before_experiment(self, callback):
-        self._before_experiment_callbacks.append(callback)
+    def on_before_experiment(self, callback, priority=50):
+        self._before_experiment_callbacks.append((callback, priority))
 
-    def on_after_experiment(self, callback):
-        self._after_experiment_callbacks.append(callback)
+    def on_after_experiment(self, callback, priority=50):
+        self._after_experiment_callbacks.append((callback, priority))
 
 
     def experiment_created(self, experiment):
-        for callback in self._experiment_created_callbacks:
+        for callback, priority in sorted(self._experiment_created_callbacks, key=lambda x: x[1]):
             experiment = callback(experiment)
         
         return experiment
 
     def before_experiment(self, experiment, params):
-        for callback in self._before_experiment_callbacks:
+        for callback, priority in sorted(self._before_experiment_callbacks, key=lambda x: x[1]):
             callback(experiment, params)
 
     def after_experiment(self):
-        for callback in self._after_experiment_callbacks:
+        for callback, priority in sorted(self._after_experiment_callbacks, key=lambda x: x[1]):
             callback()
 
 
@@ -124,7 +125,7 @@ def Parameter(
         help=help,
         default_help=default_help,
         hidden=hidden,
-        behaviour=parametric.CompositBehaviour(*behaviours),
+        behaviour=parametric.CompositeBehaviour(*behaviours),
 
         allow_from_file=allow_from_file
     )
@@ -132,7 +133,8 @@ def Parameter(
 
 class Experiment:
     """This is the class used to represent experiments. Note that you should not
-    instantiate this class manually, but only through the :func:`pystematic.experiment` decorator.
+    instantiate this class manually, but only through the
+    :func:`pystematic.experiment` decorator.
     """ 
 
     def __init__(self, main_function, name=None, defaults_override={}):
@@ -163,7 +165,7 @@ class Experiment:
         return self.run(params)
 
     def run(self, params):
-        """Runs the experiment in the current process with the parameters provided.
+        """Runs the experiment in the current process with the provided parameters.
 
         Args:
             params (dict): A dict containing the values for the parameters.
@@ -188,7 +190,7 @@ class Experiment:
         """Runs the experiment in a new process with the parameters provided.
         Returns a handle to the process object used to run the experiment. If
         you want to wait for the experiment to finish you have to manually wait
-        on the process to exit.
+        for the process to exit.
 
         Args:
             params (dict): A dict containing the values for the parameters.
@@ -293,13 +295,12 @@ def parameter_decorator(
             to be a boolean flag. A flag parameter does not need to be given a 
             value on the command line. Its mere presence on the command line will 
             automatically assign it the value True. Defaults to False.
-        multiple (bool, optional): When set to True, the parameter may appear 
-            many times on the command line. It's value will be a list of values 
-            given. Defaults to False.
+        multiple (bool, optional): When set to True, the parameter is assumed to be a list of zero or more 
+            values. Defaults to False.
         allow_from_file (bool, optional): Controls whether it should be allowed to load a value for this 
             parameter from a params file. Defaults to True.
-        envvar (typing.Union[str, None, typing.Literal[False]], optional): Name of the environment variable. 
-            Defaults to None.
+        envvar (typing.Union[str, None, typing.Literal[False]], optional): Name of the environment variable that 
+            the value for this parameter may be read from. Defaults to None.
         help (typing.Optional[str], optional): A help text for the parameter that will be 
             shown on the command line. Defaults to None.
         default_help (typing.Optional[str], optional): A help text for the default value. If None, the default 
@@ -429,29 +430,3 @@ def group_decorator(name=None):
     
     return decorator
 
-
-class PystematicPlugin:
-
-    def experiment_created(self, experiment):
-        """Gives the plugin a chance to modify an experiment when it is created
-        """
-        pass
-
-    def extend_api(self, api_object):
-        """Gives the plugin a chance to modify the pystematic API.
-        """
-        pass
-
-    def before_experiment(self, experiment, params):
-        """Called before the main function of the experiment is executed.
-
-        Args:
-            experiment (Experiment): A handle to the experiment object.
-            params (dict): Contains the values assigned to the parameters of the experiment.
-        """
-        pass
-
-    def after_experiment(self):
-        """Called after the experiment main function has returned. 
-        """
-        pass

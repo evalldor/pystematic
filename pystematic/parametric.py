@@ -3,6 +3,7 @@
 Handles all possible sources of parameter values:
 - cli
 - dict
+- (file)
 - env
 - defaults
 
@@ -91,7 +92,7 @@ class DefaultParameterBehaviour:
         result_dict[param.name] = value
 
 
-class CompositBehaviour:
+class CompositeBehaviour:
 
     def __init__(self, *behaviours):
         self.behaviours = behaviours
@@ -221,8 +222,8 @@ class Parameter:
         #
         # Validate nargs
         #
-        if nargs not in (None, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE) and not isinstance(nargs, int):
-            raise ValueError(f"Invalid nargs value '{nargs}': must be an int or one of "
+        if nargs not in (None, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE) and (not isinstance(nargs, int) or nargs < 0):
+            raise ValueError(f"Invalid nargs value '{nargs}': must be a non negative integer or one of "
                              f"'{(None, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE)}'.")
 
         if envvar is not None:

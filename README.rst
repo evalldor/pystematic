@@ -110,4 +110,4 @@ Other related tools that might interest you:
 * `Hydra <https://github.com/facebookresearch/hydra>`_: a framework for elegantly
   configuring complex applications.
 
-* `MLflow <https://github.com/mlflow/mlflow>`: a machine learning lifecycle platform.
+* `MLflow <https://github.com/mlflow/mlflow>`_: a machine learning lifecycle platform.
