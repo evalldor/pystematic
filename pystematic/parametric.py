@@ -36,6 +36,7 @@ import itertools
 import os
 import dataclasses
 
+
 OPTIONAL = "?"
 ZERO_OR_MORE = "*"
 ONE_OR_MORE = "+"
@@ -348,7 +349,6 @@ class ParamValueDict(collections.UserDict):
             param.set_cli_value(flag, value, self)
         except Exception as e:
             raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
-        
 
 
 @dataclasses.dataclass
@@ -597,6 +597,7 @@ from rich.text import Text
 from rich.console import Console
 from rich.theme import Theme
 
+
 class CliHelpFormatter:
 
     def __init__(self, no_style=False) -> None:
@@ -711,6 +712,7 @@ class CliHelpFormatter:
 
 
 ParseResult = collections.namedtuple("ParseResult", ["arg", "flag", "value"])
+
 
 class ParseError(ValueError):
     pass

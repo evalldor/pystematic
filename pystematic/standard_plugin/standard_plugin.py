@@ -7,6 +7,7 @@ import datetime
 import string
 import functools
 import inspect
+import itertools
 
 from rich.console import Console
 from rich.theme import Theme
@@ -181,6 +182,62 @@ class StandardApi:
         """
 
         return self.params["subprocess"] is not None
+
+    def param_matrix(self, **param_values):
+        """This function can be used to build parameter combinations to use when
+        running parameter sweeps. It takes an arbitrary number of keywork
+        arguments, where each argument is a parameter and a list of all values
+        that you want to try for that parameter. It then builds a list of
+        parameter dictionaries such that all combinations of parameter values
+        appear once in the list. The output of this function can be passed
+        directly to :func:`pystematic.run_parameter_sweep`.
+        
+        For example:
+        
+        .. code-block:: python
+
+            import pystematic as ps
+
+            param_list = ps.param_matrix(
+                int_param=[1, 2],
+                str_param=["hello", "world"]
+            )
+
+            assert param_list == [
+                {
+                    "int_param": 1,
+                    "str_param": "hello"
+                },
+                {
+                    "int_param": 1,
+                    "str_param": "world"
+                },
+                {
+                    "int_param": 2,
+                    "str_param": "hello"
+                },
+                {
+                    "int_param": 2,
+                    "str_param": "world"
+                }
+            ]
+
+        Returns: 
+            list of dicts: A list of parameter combinations created by taking the cartesian 
+            product of all values in the input.
+        """
+        # Make sure all values are lists
+        for key, value in param_values.items():
+            if not isinstance(value, (list, tuple)):
+                param_values[key] = [value]
+                
+        keys = param_values.keys()
+
+        param_combinations = []
+        for instance in itertools.product(*param_values.values()):
+            param_combinations.append(dict(zip(keys, instance)))
+        
+        return param_combinations
 
 
 class ParamsFileBehaviour(parametric.DefaultParameterBehaviour):

@@ -63,6 +63,7 @@ Functions
 
 .. autofunction:: pystematic.is_subprocess
 
+.. autofunction:: pystematic.param_matrix
 
 Default parameters
 ------------------

@@ -95,3 +95,27 @@ def test_output_dir_works():
 
     with pytest.raises(CustomException):
         output_exp.run({})
+
+def test_param_matrix():
+    param_list = pystematic.param_matrix(
+        int_param=[1, 2],
+        str_param=["hello", "world"]
+    )
+    assert param_list == [
+        {
+            "int_param": 1,
+            "str_param": "hello"
+        },
+        {
+            "int_param": 1,
+            "str_param": "world"
+        },
+        {
+            "int_param": 2,
+            "str_param": "hello"
+        },
+        {
+            "int_param": 2,
+            "str_param": "world"
+        }
+    ]
