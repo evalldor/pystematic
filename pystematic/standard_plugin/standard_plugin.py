@@ -21,6 +21,7 @@ from .. import parametric
 
 logger = logging.getLogger('pystematic.standard')
 
+
 class StandardPlugin:
 
     def __init__(self, app) -> None:
@@ -54,6 +55,7 @@ def _create_log_dir_name(output_dir, experiment_name):
 
     return directory
 
+
 class StandardLogHandler(logging.Handler):
 
     def __init__(self, no_style=False):
@@ -80,6 +82,7 @@ class StandardLogHandler(logging.Handler):
         name = f"[name]\[{record.name}][/name]"
 
         self.console.print(f"{level} {name} {msg}")
+
 
 class StandardApi:
 
@@ -135,6 +138,13 @@ class StandardApi:
         """Use this function to generate random numbers seeded by the experiment
         parameter ``random_seed``. Expected use is to seed your own random number
         generators.
+
+        Args:
+            nbits (int, optional): The number of bits to use to represent the 
+            generated number. Defaults to 32.
+
+        Returns:
+            int: A random number seeded by the experiment parameter ``random_seed``.
         """
         return self.random_gen.getrandbits(nbits)
     
@@ -154,8 +164,10 @@ class StandardApi:
             should pass a new seed to this function in the ``random_seed`` parameter. 
 
             E.g.:
+
+            .. code-block:: python
             
-            >>> pystematic.launch_subprocess(random_seed=pystematic.new_seed())
+                pystematic.launch_subprocess(random_seed=pystematic.new_seed())
 
         """
         subprocess_params = {name: value for name, value in self.params.items()}
@@ -170,17 +182,29 @@ class StandardApi:
         return self.current_experiment.run_in_new_process(subprocess_params)
 
     def run_parameter_sweep(self, experiment, list_of_params, max_num_processes=1) -> None:
-        """Runs an experiment with a set of different params. At most
-        :obj:`max_num_processes` concurrent processes will be used.
+        """Runs an experiment multiple times with a set of different params. At most
+        :obj:`max_num_processes` concurrent processes will be used. This call will block until 
+        all experiments have been run.
+
+        Args:
+            experiment (Experiment): The experiment to run.
+            list_of_params (list of dict): A list of parameter dictionaries. Each corresponding to 
+                one run of the experiment. See :func:`pystematic.param_matrix` for a convenient way 
+                of generating such a list.
+            max_num_processes (int, optional): The maximum number of concurrent processes to use 
+                for running the experiments. Defaults to 1.
         """
+     
         pool = ProcessQueue(max_num_processes)
         pool.run_and_wait_for_completion(experiment, list_of_params)
 
     def is_subprocess(self) -> bool:
         """Returns true if this process is a subprocess. I.e. it has been
         launched by a call to :func:`launch_subprocess` in a parent process.
-        """
 
+        Returns:
+            bool: Whether or not the current process is a subprocess.
+        """
         return self.params["subprocess"] is not None
 
     def param_matrix(self, **param_values):
@@ -221,6 +245,11 @@ class StandardApi:
                     "str_param": "world"
                 }
             ]
+
+        Args:
+            **param_values: A mapping from parameter name to a list of values to try 
+                for that parameter. If a value is not a list or tuple, it is assumed to be constant 
+                (its value will be the same in all combinations).
 
         Returns: 
             list of dicts: A list of parameter combinations created by taking the cartesian 
