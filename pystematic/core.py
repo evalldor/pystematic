@@ -3,7 +3,7 @@ import functools
 import multiprocessing
 import importlib
 import typing
-import importlib.metadata
+import importlib_metadata
 import logging
 
 from . import parametric
@@ -28,14 +28,12 @@ class PystematicApp:
         ``pystematic.plugins`` namespace.
         """
 
-        all_entry_points = importlib.metadata.entry_points()
-
-        if "pystematic.plugins" in all_entry_points:
-            
-            for entry_point in all_entry_points["pystematic.plugins"]:
-                logger.info(f"Loading plugin '{entry_point.name}'.")
-                plugin = entry_point.load()
-                self._loaded_plugins.append(plugin(self))
+        plugin_entrypoints = importlib_metadata.entry_points().select(group='pystematic.plugins')
+        
+        for entry_point in plugin_entrypoints:
+            logger.info(f"Loading plugin '{entry_point.name}'.")
+            plugin = entry_point.load()
+            self._loaded_plugins.append(plugin(self))
 
     def on_experiment_created(self, callback, priority=50):
         self._experiment_created_callbacks.append((callback, priority))
