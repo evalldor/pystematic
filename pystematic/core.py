@@ -3,6 +3,7 @@ import functools
 import multiprocessing
 import importlib
 import typing
+import typing_extensions
 import importlib_metadata
 import logging
 
@@ -80,7 +81,7 @@ def Parameter(
     is_flag: bool = False,
     multiple: bool = False,
     allow_from_file: bool = True,
-    envvar: typing.Union[str, None, typing.Literal[False]] = None,
+    envvar: typing.Union[str, None, typing_extensions.Literal[False]] = None,
 
     help: typing.Optional[str] = None,
     default_help: typing.Optional[str] = None,
@@ -272,7 +273,7 @@ def parameter_decorator(
     is_flag: bool = False,
     multiple: bool = False,
     allow_from_file: bool = True,
-    envvar: typing.Union[str, None, typing.Literal[False]] = None,
+    envvar: typing.Union[str, None, typing_extensions.Literal[False]] = None,
 
     help: typing.Optional[str] = None,
     default_help: typing.Optional[str] = None,

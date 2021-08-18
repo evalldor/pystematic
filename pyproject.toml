@@ -22,6 +22,7 @@ PyYAML = "^5.3.1"
 wrapt = "^1.12.1"
 rich = "^10.1.0"
 importlib-metadata = "^4.6.4"
+typing-extensions = "^3.10.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

@@ -30,6 +30,7 @@ It allows you to define parameters as well as read them from various sources.
 
 import collections
 import typing
+import typing_extensions
 import sys
 import re
 import itertools
@@ -153,10 +154,10 @@ class Parameter:
         name: str,
         flags: typing.Union[None, typing.List[str], str] = None,
         type: typing.Callable[[str], typing.Any] = str,
-        nargs: typing.Union[typing.Literal["?"], typing.Literal["*"], typing.Literal["+"], int, None] = None,
+        nargs: typing.Union[typing_extensions.Literal["?"], typing_extensions.Literal["*"], typing_extensions.Literal["+"], int, None] = None,
         default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
         required: bool = False,
-        envvar: typing.Union[str, None, typing.Literal[False]] = None,
+        envvar: typing.Union[str, None, typing_extensions.Literal[False]] = None,
 
         help: typing.Optional[str] = None,
         default_help: typing.Optional[str] = None,
@@ -432,7 +433,7 @@ class ParameterManager:
         name: str,
         flags: typing.Union[None, typing.List[str], str] = None,
         type: typing.Callable[[str], typing.Any] = str,
-        nargs: typing.Union[typing.Literal["?"], typing.Literal["*"], typing.Literal["+"], int, None] = None,
+        nargs: typing.Union[typing_extensions.Literal["?"], typing_extensions.Literal["*"], typing_extensions.Literal["+"], int, None] = None,
         default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
         required: bool = False,
         envvar: typing.Optional[str] = None,
