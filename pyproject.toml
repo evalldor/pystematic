@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pystematic"
-version = "0.9.0"
+version = "1.0.0"
 description = "A framework that helps you setup and run reproducible experiments in python."
 repository = "https://github.com/evalldor/pystematic"
 documentation = "https://pystematic.readthedocs.io"
@@ -8,7 +8,7 @@ license = "MIT"
 readme = "README.rst"
 authors = ["E.Valldor"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -18,19 +18,17 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.6"
-PyYAML = "^5.3.1"
+PyYAML = "^5.4.1"
 wrapt = "^1.12.1"
-rich = "^10.1.0"
+rich = "^10.7.0"
 importlib-metadata = "^4.6.4"
 typing-extensions = "^3.10.0"
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.2"
-pylint = "^2.6.0"
 sphinx-rtd-theme = "^0.5.2"
-autopep8 = "^1.5.6"
 Sphinx = "^4.1.2"
 sphinxcontrib-napoleon = "^0.7"
+pytest = "^6.2.4"
 
 [tool.poetry.plugins."pystematic.plugins"]
 "pystematic-standard" = "pystematic.standard_plugin:StandardPlugin"
