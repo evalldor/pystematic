@@ -141,7 +141,7 @@ class StandardApi:
 
         Args:
             nbits (int, optional): The number of bits to use to represent the 
-            generated number. Defaults to 32.
+                generated number. Defaults to 32.
 
         Returns:
             int: A random number seeded by the experiment parameter ``random_seed``.
