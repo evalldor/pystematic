@@ -168,9 +168,89 @@ reproducible:
 Grouping experiments
 --------------------
 
+If you have several experiments defined in the same file, you may want to be
+able to run them all from the CLI without changing your code. This is what
+groups are for.
+
+Take the following as an example:
+
+.. code-block:: python
+
+   import pystematic as ps
+
+
+   @ps.experiment
+   def prepare_dataset(params):
+      # ...
+
+   @ps.experiment
+   def fit_model(params):
+      # ...
+   
+   @ps.experiment
+   def visualize_results(params):
+      # ...
+
+   if __name__ == "__main__":
+      # prepare_dataset.cli()
+      # fit_model.cli()
+      visualize_results.cli()
+
+
+The code above has three defined experiments. We can run them from the cli by
+calling each experiments ``cli()`` function, but that would require us to change
+the code whenever we want to run another experiment. To remedy this, we can add
+them all to a group. We first use the :func:`pystematic.group` decorator to
+define the group, and then use to group's own experiment decorator to define the
+experiments, instead of the global experiment decorator. We then use the group's
+``cli()`` function to activate the cli:
+
+.. code-block:: python
+
+   import pystematic as ps
+
+   @ps.group
+   def my_group():
+      pass
+
+   @my_group.experiment # <--- Note that we are using the groups experiment 
+                        #      decorator instead of the global one.
+   def prepare_dataset(params):
+      # ...
+
+   @my_group.experiment
+   def fit_model(params):
+      # ...
+   
+   @my_group.experiment
+   def visualize_results(params):
+      # ...
+
+   if __name__ == "__main__":
+      my_group.cli()
+
+
+We can now choose which experiment to run like this:
+
+.. code-block:: bash
+
+   $ python path/to/file.py prepare-dataset <experiment params here>
+   # or:
+   $ python path/to/file.py fit-model <experiment params here>
+   # or:
+   $ python path/to/file.py visualize-results <experiment params here>
+
+
+Groups can be arbitrarily nested to create hierarchies of experiments. Note that
+the main function of the group is never run. It is only used as a symbolic
+convenience for defining the group.
 
 
 Extensions
 ----------
+
+Pystematic is built from the core to be extensible. See the page on :ref:`extending:writing
+extensions` to learn how you can design and customize experiments of your own.
+
 
 To be continued

@@ -98,3 +98,4 @@ More reading
 
    tutorial
    apidoc
+   extending
