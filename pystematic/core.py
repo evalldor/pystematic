@@ -12,6 +12,10 @@ from . import parametric
 logger = logging.getLogger("pystematic.core")
 
 class PystematicApp:
+    """A single instance of this class is created when pystematic initializes.
+    Its main purpose is to centralize extension management. When an extension is
+    initialized it is handed a reference to that instance.
+    """
 
     def __init__(self) -> None:
         self._loaded_plugins = []
@@ -21,12 +25,20 @@ class PystematicApp:
         self._after_experiment_callbacks = []
         
     def get_api_object(self):
+        """Returns a handle to the ``pystematic`` global api. Extensions can
+        retrieve the handle by calling this function, and modify the global api
+        during initialization.
+
+        Returns:
+            module: The api available under the ``pystematic`` global namespace.
+        """
         import pystematic
         return pystematic
 
     def load_all_plugins(self):
         """Finds and loads all plugins by searching entry points under the
-        ``pystematic.plugins`` namespace.
+        ``pystematic.plugins`` namespace. This function is internal and should
+        only be called once.
         """
 
         plugin_entrypoints = importlib_metadata.entry_points().select(group='pystematic.plugins')
@@ -37,26 +49,61 @@ class PystematicApp:
             self._loaded_plugins.append(plugin(self))
 
     def on_experiment_created(self, callback, priority=50):
+        """Adds a callback to the 'experiment_created' event.
+
+        Args:
+            callback (function): A function that is called whenever a new experiment is defined. 
+                It should take the created experiment as a single argument.
+            priority (int, optional): The priority of the callback. Callbacks with lower priority 
+                are called before those with higher. Defaults to 50.
+        """
         self._experiment_created_callbacks.append((callback, priority))
 
     def on_before_experiment(self, callback, priority=50):
+        """Adds a callback to the 'before_experiment' event. The event is
+        triggered before the experiment main function is called.
+
+        Args:
+        
+            callback (function): A function that is called before an experiment is
+                run. It should take two arguments; the experiment, and a dict of
+                parameter values.
+
+            priority (int, optional): The priority of the callback. Callbacks with
+                lower priority are called before those with higher. Defaults to 50.
+        """
         self._before_experiment_callbacks.append((callback, priority))
 
     def on_after_experiment(self, callback, priority=50):
+        """Adds a callback to the 'after_experiment' event. The event is
+        triggered after the experiment main function has returned.
+
+        Args:
+            callback (function): A function that is called before an experiment is run. 
+                The callback is not given any arguments.
+            priority (int, optional): The priority of the callback. Callbacks with lower priority 
+                are called before those with higher. Defaults to 50.
+        """
         self._after_experiment_callbacks.append((callback, priority))
 
 
     def experiment_created(self, experiment):
+        """Triggers the experiment_created event. Internal.
+        """
         for callback, priority in sorted(self._experiment_created_callbacks, key=lambda x: x[1]):
             experiment = callback(experiment)
         
         return experiment
 
     def before_experiment(self, experiment, params):
+        """Triggers the before_experiment event. Internal.
+        """
         for callback, priority in sorted(self._before_experiment_callbacks, key=lambda x: x[1]):
             callback(experiment, params)
 
     def after_experiment(self):
+        """Triggers the after_experiment event. Internal.
+        """
         for callback, priority in sorted(self._after_experiment_callbacks, key=lambda x: x[1]):
             callback()
 
@@ -246,9 +293,21 @@ class ExperimentGroup:
         self.experiment = functools.partial(experiment_decorator, group=self)
 
     def add_experiment(self, experiment):
+        """Adds an experiment to the group. Typically not called manually.
+
+        Args:
+            experiment (Experiment): The experiment to add
+        """
         self.experiments.append(experiment)
 
     def cli(self, argv=None):
+        """Runs the group by parsing the parameters from the command line. The
+        first argument should be the name of the experiment to run.
+
+        Args:
+            argv (List[str], optional): A list of command line arguments. If None, will use 
+                ``sys.argv``. Defaults to None.
+        """
         if argv is None:
             argv = sys.argv[1:]
 
@@ -283,27 +342,45 @@ def parameter_decorator(
     """Adds a parameter to an experiment.
 
     Args:
-        name (str): The name of the parameter. The name must be a valid python identifier.
-        type (typing.Callable[[str], typing.Any], optional): The type of the parameter. Defaults to str.
-        default (typing.Union[typing.Any, typing.Callable[[], typing.Any], None], optional): The default value of 
-            the parameter. Can be either a value or a callable. Defaults to None.
-        required (bool, optional): Set to True if this parameter is required. Defaults to False.
-        allowed_values (list[typing.Any], optional): If given, the value must be in the list of allowed values. 
-            Defaults to None.
-        is_flag (bool, optional): When set to True, this parameter is assumed 
-            to be a boolean flag. A flag parameter does not need to be given a 
-            value on the command line. Its mere presence on the command line will 
+
+        name (str): The name of the parameter. The name must be a valid python
+            identifier.
+
+        type (typing.Callable[[str], typing.Any], optional): The type of the
+            parameter. Defaults to str.
+
+        default (typing.Union[typing.Any, typing.Callable[[], typing.Any], None], optional): 
+            The default value of the parameter. Can be either a value or a callable that 
+            returns the value. Defaults to None.
+
+        required (bool, optional): Set to True if this parameter is required.
+            Defaults to False.
+
+        allowed_values (list[typing.Any], optional): If given, the value must be in
+            the list of allowed values. Defaults to None.
+
+        is_flag (bool, optional): When set to True, this parameter is assumed to be
+            a boolean flag. A flag parameter does not need to be given a value on
+            the command line. Its mere presence on the command line will
             automatically assign it the value True. Defaults to False.
-        multiple (bool, optional): When set to True, the parameter is assumed to be a list of zero or more 
-            values. Defaults to False.
-        allow_from_file (bool, optional): Controls whether it should be allowed to load a value for this 
-            parameter from a params file. Defaults to True.
-        envvar (typing.Union[str, None, typing.Literal[False]], optional): Name of the environment variable that 
-            the value for this parameter may be read from. Defaults to None.
-        help (typing.Optional[str], optional): A help text for the parameter that will be 
-            shown on the command line. Defaults to None.
-        default_help (typing.Optional[str], optional): A help text for the default value. If None, the default 
-            help text will be created by calling ``str(default_value)``. Defaults to None.
+
+        multiple (bool, optional): When set to True, the parameter is assumed to be
+            a list of zero or more values. Defaults to False.
+
+        allow_from_file (bool, optional): Controls whether it should be allowed to
+            load a value for this parameter from a params file. Defaults to True.
+
+        envvar (typing.Union[str, None, typing.Literal[False]], optional): Name of
+            the environment variable that the value for this parameter may be read
+            from. Defaults to None.
+
+        help (typing.Optional[str], optional): A help text for the parameter that
+            will be shown on the command line. Defaults to None.
+
+        default_help (typing.Optional[str], optional): A help text for the default
+            value. If None, the default help text will be created by calling
+            ``str(default_value)``. Useful when the default value is a callable. 
+            Defaults to None.
     """
     
     def decorator(experiment):
@@ -409,7 +486,8 @@ def experiment_decorator(
 
 
 def group_decorator(name=None):
-    """Used to group experiments. This decorator is used on a function.
+    """Used to group experiments. This decorator is used on a function. Note
+    that the decorated function will never be called.
 
     Args:
         name (str, optional): The name of the group. Defaults to None.

@@ -148,7 +148,8 @@ class BooleanFlagBehaviour(DefaultParameterBehaviour):
 
 
 class Parameter:
-
+    """Represents a parameter. 
+    """
     def __init__(
         self,
         name: str,
@@ -378,7 +379,10 @@ class ParameterGroup:
 
 
 class ParameterManager:
-
+    """The Parameter Manager essentialy consists of a set of parameters, and a
+    set of operations to perform with those paramters, such as parsing them from
+    cli, etc.
+    """
     def __init__(
         self, 
         defaults_override={}, 

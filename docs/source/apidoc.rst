@@ -4,23 +4,36 @@ API reference
 Decorators
 ----------
 
-.. autodecorator:: pystematic.experiment(name=None, inherit_params=None, defaults={}, group=None)
+.. autodecorator:: pystematic.experiment
 
 .. autodecorator:: pystematic.parameter
 
-.. autofunction:: pystematic.group(name=None)
+.. autofunction:: pystematic.group
 
-Experiment classes
+Core types
 ------------------
 
 These classes are not supposed to be instantiated manually, but only through
 their corresponding decorators.
 
 .. autoclass:: pystematic.core.Experiment
-    :members: add_parameter, get_parameters, run, cli, run_in_new_process
-    :undoc-members:
+  :members: add_parameter, get_parameters, run, cli, run_in_new_process
+  :undoc-members:
+
 
 .. autoclass:: pystematic.core.ExperimentGroup
+  :members: cli
+  :undoc-members:
+
+  .. decorator:: experiment(name=None, inherit_params=None, defaults={})
+
+    Creates an experiment and adds it to this group. See :func:`pystematic.experiment`.
+
+
+.. autoclass:: pystematic.core.PystematicApp
+  :members: get_api_object, on_experiment_created, on_before_experiment, on_after_experiment
+  :undoc-members:
+
 
 Experiment API
 --------------
@@ -35,21 +48,21 @@ These attributes holds information related to the current experiment. Note that
 they are uninitialized until an experiment has actually started.
 
 .. autodata:: pystematic.output_dir
-    :annotation: : pathlib.Path
+  :annotation: : pathlib.Path
 
-    Holds a :code:`pathlib.Path` object that points to the current output
-    directory. All output from an experiment should be written to this folder.
-    All internal procedures that produce output will always write it to this
-    folder. When you want to output something persistent from the experiment
-    yourself, it is your responsibly to use this output directory.
+  Holds a :code:`pathlib.Path` object that points to the current output
+  directory. All output from an experiment should be written to this folder.
+  All internal procedures that produce output will always write it to this
+  folder. When you want to output something persistent from the experiment
+  yourself, it is your responsibly to use this output directory.
 
 
 .. autodata:: pystematic.params 
-    :annotation: : dict
+  :annotation: : dict
 
-    Holds a dict of all parameters of the current experiment. It is the same
-    dict that is passed to the main function. **You should never modify this
-    dict.**
+  Holds a dict of all parameters of the current experiment. It is the same
+  dict that is passed to the main function. **You should never modify this
+  dict.**
 
 
 Functions
