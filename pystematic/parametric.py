@@ -606,17 +606,20 @@ from rich.theme import Theme
 class CliHelpFormatter:
 
     def __init__(self, no_style=False) -> None:
-        theme = Theme({
-            "metavar" : "dark_sea_green4",
-            "heading": "bold",
-            "flag": "cyan",
-            "help_heading": "bold",
-            "default_value": "white"
-
-        }, inherit=False)
+       
 
         if no_style:
             theme = Theme({}, inherit=False)
+        
+        else:
+             theme = Theme({
+                "metavar" : "dark_sea_green4",
+                "heading": "bold",
+                "flag": "cyan",
+                "help_heading": "bold",
+                "default_value": "white"
+
+            }, inherit=False)
 
         self.console = Console(theme=theme)
 
