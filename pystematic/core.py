@@ -391,8 +391,8 @@ def parameter_decorator(
             parameter. Must be a callable that takes a single string value argument
             and returns the converted value. Defaults to str.
 
-        default (typing.Union[typing.Any, typing.Callable[[], typing.Any], None],
-            optional): The default value of the parameter. Can be either a value or
+        default (typing.Union[typing.Any, typing.Callable[[], typing.Any], None], optional): 
+            The default value of the parameter. Can be either a value or
             a zero arguments callable that returns the value. Defaults to None.
 
         required (bool, optional): Set to True if this parameter is required. If a
