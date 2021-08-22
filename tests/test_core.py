@@ -119,3 +119,26 @@ def test_param_matrix():
             "str_param": "world"
         }
     ]
+
+def test_group_nesting():
+    class ExpRan(Exception):
+        pass
+
+    @pystematic.group
+    def group1(params):
+        pass
+
+    @group1.group
+    def group2(params):
+        pass
+
+    @pystematic.parameter(
+        name="param1"
+    )
+    @group2.experiment
+    def exp(params):
+        assert params["param1"] == "value"
+        raise ExpRan()
+    
+    with pytest.raises(ExpRan):
+        group1.cli(["group2", "exp", "--param1", "value"])

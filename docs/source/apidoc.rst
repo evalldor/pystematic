@@ -11,7 +11,7 @@ Decorators
 .. autofunction:: pystematic.group
 
 Core types
-------------------
+----------
 
 These classes are not supposed to be instantiated manually, but only through
 their corresponding decorators.
@@ -22,12 +22,8 @@ their corresponding decorators.
 
 
 .. autoclass:: pystematic.core.ExperimentGroup
-  :members: cli
+  :members: experiment, group, cli
   :undoc-members:
-
-  .. decorator:: experiment(name=None, inherit_params=None, defaults={})
-
-    Creates an experiment and adds it to this group. See :func:`pystematic.experiment`.
 
 
 .. autoclass:: pystematic.core.PystematicApp
