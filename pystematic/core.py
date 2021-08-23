@@ -4,12 +4,8 @@ import multiprocessing
 import importlib
 import typing
 import typing_extensions
+import importlib_metadata
 import logging
-
-try:
-    import importlib.metadata as importlib_metadata
-except ImportError:
-    import importlib_metadata as importlib_metadata
 
 from . import parametric
 from . import cli_help_formatters
