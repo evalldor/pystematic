@@ -25,6 +25,8 @@ their corresponding decorators.
   :members: experiment, group, cli
   :undoc-members:
 
+.. autoclass:: pystematic.core.Parameter
+  :members: 
 
 .. autoclass:: pystematic.core.PystematicApp
   :members: get_api_object, on_experiment_created, on_before_experiment, on_after_experiment
