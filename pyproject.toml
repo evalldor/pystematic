@@ -21,7 +21,7 @@ python = "^3.6"
 PyYAML = "^5.4.1"
 wrapt = "^1.12.1"
 rich = "^10.7.0"
-importlib-metadata = "^4.6.4"
+importlib-metadata = { version = "^4.6.4", python = "<3.8" }
 typing-extensions = "^3.10.0"
 
 [tool.poetry.dev-dependencies]
