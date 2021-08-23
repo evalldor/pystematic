@@ -1,4 +1,6 @@
-__version__ = '1.1.0'
+import importlib_metadata as _importlib_metadata
+
+__version__ = _importlib_metadata.version(__name__)
 
 from . import core as _core
 
