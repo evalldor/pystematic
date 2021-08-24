@@ -241,6 +241,14 @@ We can now choose which experiment to run like this:
    $ python path/to/file.py visualize-results <experiment params here>
 
 
+To get a list of all available experiments simply run the script with the ``-h``
+flag:
+
+.. code-block:: bash
+
+   $ python path/to/file.py -h
+
+
 Groups can be arbitrarily nested to create hierarchies of experiments. Note that
 the main function of the group is never run. It is only used as a symbolic
 convenience for defining the group.
@@ -249,8 +257,9 @@ convenience for defining the group.
 Extensions
 ----------
 
-Pystematic is built from the core to be extensible. See the page on :ref:`extending:writing
-extensions` to learn how you can design and customize experiments of your own.
+Pystematic is built from the core to be extensible. See the page on
+:ref:`extending:writing extensions` to learn how you can design and customize
+experiments of your own.
 
 
 To be continued

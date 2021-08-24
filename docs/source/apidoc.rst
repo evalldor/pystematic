@@ -20,7 +20,6 @@ their corresponding decorators.
   :members: add_parameter, get_parameters, run, cli, run_in_new_process
   :undoc-members:
 
-
 .. autoclass:: pystematic.core.ExperimentGroup
   :members: experiment, group, cli
   :undoc-members:
@@ -38,6 +37,7 @@ Experiment API
 
 The experiment API is available for the currently running experiment. The use of
 the API when no experiment is running results in undefined behavior. 
+
 
 Global attributes
 +++++++++++++++++
@@ -75,6 +75,7 @@ Functions
 .. autofunction:: pystematic.is_subprocess
 
 .. autofunction:: pystematic.param_matrix
+
 
 Default parameters
 ------------------
