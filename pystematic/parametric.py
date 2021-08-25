@@ -37,6 +37,11 @@ import itertools
 import os
 import dataclasses
 
+class BaseError(Exception):
+    pass
+
+class ValidationError(Exception):
+    pass
 
 OPTIONAL = "?"
 ZERO_OR_MORE = "*"
@@ -59,7 +64,7 @@ class ChoiceType:
                 if str(allowed_value).lower() == str(value).lower():
                     return allowed_value
 
-        raise ValueError(f"Expected a value in {self.allowed_values}, got '{str(value)}'.")
+        raise ValidationError(f"Expected a value in {self.allowed_values}, got '{str(value)}'.")
 
 
 class BooleanType:
@@ -74,7 +79,7 @@ class BooleanType:
         elif value is None:
             return False
         
-        raise ValueError(f"Boolean value expected, got {value}.")
+        raise ValidationError(f"Boolean value expected, got {value}.")
 
 
 class IdentityType:
@@ -529,10 +534,10 @@ class ParameterManager:
     def validate_values(self, result_dict):
         for param in self.get_parameters():
             if param.name not in result_dict:
-                raise ValueError(f"Missing value for param '{param.name}'.")
+                raise ValidationError(f"Missing value for param '{param.name}'.")
             
             if param.required and result_dict[param.name] is None:
-                raise ValueError(f"Parameter '{param.name}' is required.")
+                raise ValidationError(f"Parameter '{param.name}' is required.")
 
     def from_cli(self, argv=None, defaults=True, env=True):
         result_dict = ParamValueDict(self.get_parameters())
@@ -594,6 +599,10 @@ class ParameterManager:
     def print_cli_help(self):
         self.cli_help_formatter.print_help(self.get_cli_positionals(), self.get_cli_optionals())
 
+    def print_error(self, e: Exception):
+        self.cli_help_formatter.print_error(e)
+
+
 
 from rich.table import Table
 from rich.padding import Padding
@@ -617,7 +626,8 @@ class CliHelpFormatter:
                 "heading": "bold",
                 "flag": "cyan",
                 "help_heading": "bold",
-                "default_value": "white"
+                "default_value": "white",
+                "error": "bold red"
 
             }, inherit=False)
 
@@ -642,6 +652,9 @@ class CliHelpFormatter:
         
         if len(optionals) > 0:
             self._print_optionals_help(optionals)
+
+    def print_error(self, error:Exception):
+        self.console.print(f"[error]Error:[/error] {error}")
 
     def _format_metavar(self, param, metavar="<value>"):
 

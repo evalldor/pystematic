@@ -20,6 +20,9 @@ class GroupHelpFormatter(parametric.CliHelpFormatter):
         print()
         self._print_experiments()
 
+    def print_error(self, error:Exception):
+        self.console.print(f"[error]Error:[/error] {error} "f"Use [flag]-h[/flag] for help.")
+
     def _print_experiments(self):
         self.console.print("[heading]Registered experiments:[/heading]")
         grid = Table(

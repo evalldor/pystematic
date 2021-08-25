@@ -236,7 +236,12 @@ class Experiment:
         if argv is None:
             argv = sys.argv[1:]
 
-        param_values = self.param_manager.from_cli(argv)
+        try:
+            param_values = self.param_manager.from_cli(argv)
+        except parametric.ValidationError as e:
+            self.param_manager.print_error(e)
+            sys.exit(1)
+            
         self._run_experiment(param_values)
 
     def run_in_new_process(self, params):
@@ -357,14 +362,19 @@ class ExperimentGroup:
         if argv is None:
             argv = sys.argv[1:]
 
-        param_values, argv_rest = self.param_manager.from_shared_cli(argv)
+        try:
+            param_values, argv_rest = self.param_manager.from_shared_cli(argv)
+            
+            experiments = {exp.name: exp for exp in self.experiments}
+
+            exp_name = param_values["experiment"]
+            
+            if exp_name not in experiments:
+                raise parametric.ValidationError(f"Invalid experiment name '{exp_name}'.")
+        except parametric.ValidationError as e:
+            self.param_manager.print_error(e)
+            sys.exit(1)
         
-        experiments = {exp.name: exp for exp in self.experiments}
-
-        exp_name = param_values["experiment"]
-        if exp_name not in experiments:
-            raise Exception(f"Invalid experiment name '{exp_name}'.")
-
         experiments[exp_name].cli(argv_rest)
 
 

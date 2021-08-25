@@ -60,7 +60,6 @@ def test_parsing():
     )
 
     # parser.print_help()
-
     parser.parse_args(["woot", "asd", "odn", "fpo", "sdnf", "--multiple-str", "asd", "asdasd", "--flag-param", "1"])
     res = parser.parse_known_args(["--multiple-str", "asd", "--asdasd", "asdasd", "--flag-param", "1", "woot", "asd", "odn", "fpo", "sdnf"])
     parser.parse_args(["--multiple-str", "asd", "asdasd", "--flag-param", "1", "woot", "asd", "odn", "fpo", "sdnf", "--int-param", "1"])
