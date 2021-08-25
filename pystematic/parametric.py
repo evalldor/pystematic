@@ -324,7 +324,7 @@ class Parameter:
 
 
 class ParamValueDict(collections.UserDict):
-
+    # todo: go back to scopes and __set_item__
     def __init__(self, params):
         super().__init__()
         self.params = params
