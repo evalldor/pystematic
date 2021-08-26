@@ -167,3 +167,29 @@ def test_cli_exit():
     
     with pytest.raises(Exception):
         exp.cli(["--int-param", "3"], exit_on_error=False)
+
+def test_experiment_nesting():
+    
+
+    @pystematic.parameter(
+        name="str_param"
+    )    
+    @pystematic.experiment
+    def exp1(params):
+        exp2.run({
+            "str_param": "exp2"
+        })
+
+    @pystematic.parameter(
+        name="str_param"
+    )
+    @pystematic.experiment
+    def exp2(params):
+        pass
+
+    with pytest.raises(pystematic.core.ExperimentError):
+        exp1.run({
+            "str_param": "exp1"
+        })
+
+

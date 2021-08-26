@@ -12,6 +12,13 @@ from . import cli_help_formatters
 
 logger = logging.getLogger("pystematic.core")
 
+class BaseError(Exception):
+    pass
+
+class ExperimentError(BaseError):
+    pass
+
+
 class PystematicApp:
     """A single instance of this class is created when pystematic initializes.
     Its main purpose is to centralize extension management. When an extension is
@@ -24,6 +31,8 @@ class PystematicApp:
         self._experiment_created_callbacks = []
         self._before_experiment_callbacks = []
         self._after_experiment_callbacks = []
+        
+        self._active_experiment = None
         
     def get_api_object(self):
         """Returns a handle to the ``pystematic`` global api. Extensions can
@@ -99,15 +108,22 @@ class PystematicApp:
     def before_experiment(self, experiment, params):
         """Triggers the before_experiment event. Internal.
         """
+        if self._active_experiment is not None:
+            raise ExperimentError("An experiment is already running. At most one experiment can be active at a time.")
+
+        self._active_experiment = experiment
+
         for callback, priority in sorted(self._before_experiment_callbacks, key=lambda x: x[1]):
             callback(experiment, params)
 
     def after_experiment(self):
         """Triggers the after_experiment event. Internal.
         """
+        
         for callback, priority in sorted(self._after_experiment_callbacks, key=lambda x: x[1]):
             callback()
 
+        self._active_experiment = None
 
 app = PystematicApp()
 
