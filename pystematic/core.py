@@ -212,7 +212,6 @@ class Experiment:
     def __init__(self, main_function, name=None, defaults_override={}):
         self.main_function = main_function
         self.name = name or main_function.__name__.lower().replace("_", "-")
-        self._defaults_override = defaults_override
         
         self.param_manager = parametric.ParameterManager(
             defaults_override=defaults_override,
@@ -402,9 +401,6 @@ class ExperimentGroup:
         Args:
             experiment (Experiment, ExperimentGroup): The experiment or group to add
         """
-
-        _inherit_params(experiment, self)
-
         self.experiments.append(experiment)
 
     def cli(self, argv=None, exit_on_error=True):
@@ -608,12 +604,14 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
     if group is not None:
         group.add_experiment(experiment)
 
-    if hasattr(main_function, "__params_memo__"):
-        for param in main_function.__params_memo__:
-            experiment.add_parameter(param)
+        _inherit_params(experiment, group)
 
     if inherit_params is not None:
         _inherit_params(experiment, inherit_params)
+
+    if hasattr(main_function, "__params_memo__"):
+        for param in main_function.__params_memo__:
+            experiment.add_parameter(param)
 
     return experiment
 
@@ -623,21 +621,22 @@ def _group_constructor(main_function, name=None, inherit_params=None, group=None
 
     if group is not None: # nested groups
         group.add_experiment(new_group)
-        
-    if hasattr(main_function, "__params_memo__"):
-        for param in main_function.__params_memo__:
-            new_group.add_parameter(param)
+
+        _inherit_params(new_group, group)
 
     if inherit_params is not None:
         _inherit_params(new_group, inherit_params)
 
-    
-    
+    if hasattr(main_function, "__params_memo__"):
+        for param in main_function.__params_memo__:
+            new_group.add_parameter(param)
+
     return new_group
 
 
 def _inherit_params(experiment, inherit_from):
-    """Adds all parameters to experiment from experiments or groups listed in inherit_from."""
+    """Adds all parameters to experiment from experiments or groups listed in
+    inherit_from."""
 
     existing_params = [param.name for param in experiment.get_parameters()]
 
@@ -651,10 +650,9 @@ def _inherit_params(experiment, inherit_from):
             for param in exp.param_manager.get_parameters():
                 if param.name not in existing_params:
                     experiment.add_parameter(param)
-        elif callable(exp):
-            if hasattr(exp, "__params_memo__"):
-                for param in exp.__params_memo__:
-                    if param.name not in existing_params:
-                        experiment.add_parameter(param)
+        elif hasattr(exp, "__params_memo__"):
+            for param in exp.__params_memo__:
+                if param.name not in existing_params:
+                    experiment.add_parameter(param)
         else:
             raise ValueError(f"Unknown value passed to 'inherit_params': {exp}")

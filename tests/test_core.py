@@ -28,8 +28,6 @@ def test_define_experiment():
     assert exp.name == "override"
 
 
-
-
 def test_main_function_is_run():
 
     class CustomException(Exception):
@@ -87,6 +85,7 @@ def test_params_are_added():
         )
         def exp(params):
             pass
+
 
 def test_experiment_group():
 
@@ -264,13 +263,20 @@ def test_parameter_inheritence_error_handling():
     @pystematic.group
     def group(params):
         pass
+
+    @pystematic.parameter(
+        name="param1"
+    )
+    @pystematic.experiment
+    def exp(params):
+        pass
     
     with pytest.raises(Exception):
         @pystematic.parameter(
             name="param1"
         )
         @group.experiment
-        def exp(params):
+        def exp2(params):
             pass
     
     with pytest.raises(Exception):
@@ -281,7 +287,7 @@ def test_parameter_inheritence_error_handling():
         @pystematic.parameter(
             name="param1"
         )
-        def exp(params):
+        def exp2(params):
             pass
 
     with pytest.raises(Exception):
@@ -298,6 +304,26 @@ def test_parameter_inheritence_error_handling():
             name="param1"
         )
         def group2(params):
+            pass
+
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @pystematic.experiment(
+            inherit_params=exp
+        )
+        def exp2(params):
+            pass
+
+    with pytest.raises(Exception):
+        @pystematic.experiment(
+            inherit_params=exp
+        )
+        @pystematic.parameter(
+            name="param1"
+        )
+        def exp2(params):
             pass
 
 
