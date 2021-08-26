@@ -57,6 +57,12 @@ from the command line:
 
 you will see that the experiment is run.
 
+.. note::
+   At most one experiment can be active at a time. This mean that if you want to
+   run an experiment from within another experiment, you need to start the new
+   experiment in a new process, which can be done with the method
+   :meth:`pystematic.core.Experiment.run_in_new_process`.
+
 Adding parameters
 -----------------
 
