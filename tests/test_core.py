@@ -120,6 +120,21 @@ def test_param_matrix():
         }
     ]
 
+    param_list = pystematic.param_matrix(
+        int_param=[1, 2],
+        str_param="hello"
+    )
+    assert param_list == [
+        {
+            "int_param": 1,
+            "str_param": "hello"
+        },
+        {
+            "int_param": 2,
+            "str_param": "hello"
+        }
+    ]
+
 def test_group_nesting():
     class ExpRan(Exception):
         pass
@@ -169,7 +184,7 @@ def test_cli_exit():
         exp.cli(["--int-param", "3"], exit_on_error=False)
 
 def test_experiment_nesting():
-    
+
 
     @pystematic.parameter(
         name="str_param"
