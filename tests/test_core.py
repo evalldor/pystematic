@@ -4,6 +4,11 @@ import pystematic.core
 from pystematic import output_dir
 
 
+def _list_contains_param_with_name(param_list, *param_names):
+    existing_param_names = {param.name for param in param_list}
+
+    return len(param_names) == len(existing_param_names.intersection(param_names))
+
 
 def test_define_experiment():
 
@@ -23,6 +28,8 @@ def test_define_experiment():
     assert exp.name == "override"
 
 
+
+
 def test_main_function_is_run():
 
     class CustomException(Exception):
@@ -40,14 +47,6 @@ def test_main_function_is_run():
 
 
 def test_params_are_added():
-
-    def _list_contains_param_with_name(param_list, param_name):
-
-        for param in param_list:
-            if param.name == param_name:
-                return True
-
-        return False
 
     class CustomException(Exception):
         pass
@@ -70,8 +69,7 @@ def test_params_are_added():
 
     params = exp.get_parameters()
     
-    assert _list_contains_param_with_name(params, "test_param")
-    assert _list_contains_param_with_name(params, "int_param")
+    assert _list_contains_param_with_name(params, "test_param", "int_param")
     
     with pytest.raises(CustomException):
         exp.cli(["--test-param", "test", "--int-param", "3"])
@@ -79,6 +77,16 @@ def test_params_are_added():
     with pytest.raises(CustomException):
         exp.run({"test_param": "test", "int_param": 3})
 
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @pystematic.experiment
+        @pystematic.parameter(
+            name="param1"
+        )
+        def exp(params):
+            pass
 
 def test_experiment_group():
 
@@ -133,6 +141,7 @@ def test_output_dir_works():
     with pytest.raises(CustomException):
         output_exp.run({})
 
+
 def test_param_matrix():
     param_list = pystematic.param_matrix(
         int_param=[1, 2],
@@ -171,6 +180,7 @@ def test_param_matrix():
             "str_param": "hello"
         }
     ]
+
 
 def test_group_nesting():
     class ExpRan(Exception):
@@ -220,6 +230,7 @@ def test_cli_exit():
     with pytest.raises(Exception):
         exp.cli(["--int-param", "3"], exit_on_error=False)
 
+
 def test_experiment_nesting():
 
 
@@ -244,15 +255,53 @@ def test_experiment_nesting():
             "str_param": "exp1"
         })
 
+
+def test_parameter_inheritence_error_handling():
+
+    @pystematic.parameter(
+        name="param1"
+    )
+    @pystematic.group
+    def group(params):
+        pass
+    
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @group.experiment
+        def exp(params):
+            pass
+    
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @group.experiment
+        @pystematic.parameter(
+            name="param1"
+        )
+        def exp(params):
+            pass
+
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @group.group
+        def group2(params):
+            pass
+    
+    with pytest.raises(Exception):
+        @group.group
+        @pystematic.parameter(
+            name="param1"
+        )
+        def group2(params):
+            pass
+
+
 def test_experiment_inherit_params_from_group():
-
-    def _list_contains_param_with_name(param_list, param_name):
-
-        for param in param_list:
-            if param.name == param_name:
-                return True
-
-        return False
 
     class ExpRan(Exception):
         pass
@@ -281,9 +330,7 @@ def test_experiment_inherit_params_from_group():
         assert params["param3"] == "value3"
         raise ExpRan()
 
-    assert _list_contains_param_with_name(exp.get_parameters(), "param1")
-    assert _list_contains_param_with_name(exp.get_parameters(), "param2")
-    assert _list_contains_param_with_name(exp.get_parameters(), "param3")
+    assert _list_contains_param_with_name(exp.get_parameters(), "param1", "param2", "param3")
     
     with pytest.raises(ExpRan):
         group1.cli(["group2", "exp", "--param1", "value1", "--param2", "value2", "--param3", "value3"])

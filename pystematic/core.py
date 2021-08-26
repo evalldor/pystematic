@@ -13,8 +13,10 @@ from . import cli_help_formatters
 
 logger = logging.getLogger("pystematic.core")
 
+
 class BaseError(Exception):
     pass
+
 
 class ExperimentError(BaseError):
     pass
@@ -603,6 +605,9 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
 
     experiment = app.experiment_created(experiment)
 
+    if group is not None:
+        group.add_experiment(experiment)
+
     if hasattr(main_function, "__params_memo__"):
         for param in main_function.__params_memo__:
             experiment.add_parameter(param)
@@ -610,15 +615,15 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
     if inherit_params is not None:
         _inherit_params(experiment, inherit_params)
 
-    if group is not None:
-        group.add_experiment(experiment)
-
     return experiment
 
 
 def _group_constructor(main_function, name=None, inherit_params=None, group=None):
     new_group = ExperimentGroup(main_function, name=name)
 
+    if group is not None: # nested groups
+        group.add_experiment(new_group)
+        
     if hasattr(main_function, "__params_memo__"):
         for param in main_function.__params_memo__:
             new_group.add_parameter(param)
@@ -626,8 +631,7 @@ def _group_constructor(main_function, name=None, inherit_params=None, group=None
     if inherit_params is not None:
         _inherit_params(new_group, inherit_params)
 
-    if group is not None: # nested groups
-        group.add_experiment(new_group)
+    
     
     return new_group
 
