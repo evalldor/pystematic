@@ -21,7 +21,7 @@ their corresponding decorators.
   :undoc-members:
 
 .. autoclass:: pystematic.core.ExperimentGroup
-  :members: experiment, group, cli
+  :members: experiment, group, cli, add_parameter, get_parameters
   :undoc-members:
 
 .. autoclass:: pystematic.core.Parameter

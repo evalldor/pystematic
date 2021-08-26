@@ -21,7 +21,7 @@ class GroupHelpFormatter(parametric.CliHelpFormatter):
         self._print_experiments()
 
     def print_error(self, error:Exception):
-        self.console.print(f"[error]Error:[/error] {error} "f"Use [flag]-h[/flag] for help.")
+        self.console.print(f"[error]Error:[/error] {error} Use [flag]-h[/flag] for help.")
 
     def _print_experiments(self):
         self.console.print("[heading]Registered experiments:[/heading]")
@@ -52,4 +52,4 @@ class GroupHelpFormatter(parametric.CliHelpFormatter):
 class ExperimentHelpFormatter(parametric.CliHelpFormatter):
 
     def print_error(self, error:Exception):
-        self.console.print(f"[error]Error:[/error] {error} "f"Use [flag]-h[/flag] for help.")
+        self.console.print(f"[error]Error:[/error] {error} Use [flag]-h[/flag] for help.")

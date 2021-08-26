@@ -1,6 +1,27 @@
 import pytest
 import pystematic
+import pystematic.core
 from pystematic import output_dir
+
+
+
+def test_define_experiment():
+
+    @pystematic.experiment
+    def exp(params):
+        pass
+
+    assert isinstance(exp, pystematic.core.Experiment)
+    assert exp.name == "exp"
+
+    @pystematic.experiment(
+        name="override"
+    )
+    def exp(params):
+        pass
+
+    assert exp.name == "override"
+
 
 def test_main_function_is_run():
 
@@ -20,17 +41,25 @@ def test_main_function_is_run():
 
 def test_params_are_added():
 
+    def _list_contains_param_with_name(param_list, param_name):
+
+        for param in param_list:
+            if param.name == param_name:
+                return True
+
+        return False
+
     class CustomException(Exception):
         pass
     
     @pystematic.parameter(
         name="test_param"
     )
+    @pystematic.experiment
     @pystematic.parameter(
         name="int_param",
         type=int
     )
-    @pystematic.experiment
     def exp(params):
         assert "test_param" in params
         assert params["test_param"] == "test"
@@ -38,6 +67,11 @@ def test_params_are_added():
         assert "int_param" in params
         assert params["int_param"] == 3
         raise CustomException()
+
+    params = exp.get_parameters()
+    
+    assert _list_contains_param_with_name(params, "test_param")
+    assert _list_contains_param_with_name(params, "int_param")
     
     with pytest.raises(CustomException):
         exp.cli(["--test-param", "test", "--int-param", "3"])
@@ -73,6 +107,9 @@ def test_experiment_group():
     def exp2(params):
         assert params["param2"] == "value"
         raise Exp2Ran()
+
+    with pytest.raises(Exception):
+        group.cli([], exit_on_error=False)
 
     with pytest.raises(Exp1Ran):
         group.cli(["exp1", "--param1", "value"])
@@ -207,4 +244,46 @@ def test_experiment_nesting():
             "str_param": "exp1"
         })
 
+def test_experiment_inherit_params_from_group():
 
+    def _list_contains_param_with_name(param_list, param_name):
+
+        for param in param_list:
+            if param.name == param_name:
+                return True
+
+        return False
+
+    class ExpRan(Exception):
+        pass
+
+    @pystematic.parameter(
+        name="param1"
+    )
+    @pystematic.group
+    def group1(params):
+        pass
+
+    @pystematic.parameter(
+        name="param2"
+    )
+    @group1.group
+    def group2(params):
+        pass
+
+    @pystematic.parameter(
+        name="param3"
+    )
+    @group2.experiment
+    def exp(params):
+        assert params["param1"] == "value1"
+        assert params["param2"] == "value2"
+        assert params["param3"] == "value3"
+        raise ExpRan()
+
+    assert _list_contains_param_with_name(exp.get_parameters(), "param1")
+    assert _list_contains_param_with_name(exp.get_parameters(), "param2")
+    assert _list_contains_param_with_name(exp.get_parameters(), "param3")
+    
+    with pytest.raises(ExpRan):
+        group1.cli(["group2", "exp", "--param1", "value1", "--param2", "value2", "--param3", "value3"])

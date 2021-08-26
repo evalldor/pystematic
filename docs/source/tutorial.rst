@@ -255,6 +255,25 @@ flag:
    $ python path/to/file.py -h
 
 
+Another feature of groups is that all parameters that you add to the group will
+be inherited by all experiments in the group. This is very useful when you have
+several experiments take share a set of common parameters. By adding the common
+parameters to the group, you don't have to repeat the parameter definitions for
+every experiment. In the example above, we could define a common parameters like
+this:
+
+.. code-block:: python
+
+   import pystematic as ps
+
+   @pystematic.parameter(
+      name="dataset_path",
+      type=str
+   )
+   @ps.group
+   def my_group():
+      pass
+
 Groups can be arbitrarily nested to create hierarchies of experiments. Note that
 the main function of the group is never run. It is only used as a symbolic
 convenience for defining the group.
