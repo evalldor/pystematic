@@ -197,7 +197,8 @@ class Experiment:
         
         self.param_manager = parametric.ParameterManager(
             defaults_override=defaults_override,
-            add_cli_help_option=True
+            add_cli_help_option=True,
+            cli_help_formatter=cli_help_formatters.ExperimentHelpFormatter()
         )
 
     def add_parameter(self, param):
@@ -226,21 +227,29 @@ class Experiment:
         param_values = self.param_manager.from_dict(params)
         self._run_experiment(param_values)
 
-    def cli(self, argv=None):
+    def cli(self, argv=None, exit_on_error=True):
         """Runs the experiment by parsing the parameters from the command line.
 
         Args:
             argv (List[str], optional): A list of command line arguments. If None, will use 
                 ``sys.argv``. Defaults to None.
+            exit_on_error (bool, optional): If an error occurs during cli parsing, the default 
+                behavior is to print the error and exit the program. You can disable this 
+                behavior by setting this parameter to False, in which case the error will be 
+                raised. Defaults to True.
         """
+        
         if argv is None:
             argv = sys.argv[1:]
 
         try:
             param_values = self.param_manager.from_cli(argv)
-        except parametric.ValidationError as e:
-            self.param_manager.print_error(e)
-            sys.exit(1)
+        except Exception as e:
+            if exit_on_error:
+                self.param_manager.print_error(e)
+                sys.exit(1)
+            else:
+                raise e
             
         self._run_experiment(param_values)
 
@@ -351,13 +360,17 @@ class ExperimentGroup:
         """
         self.experiments.append(experiment)
 
-    def cli(self, argv=None):
+    def cli(self, argv=None, exit_on_error=True):
         """Runs the group by parsing the parameters from the command line. The
         first argument should be the name of the experiment to run.
 
         Args:
             argv (List[str], optional): A list of command line arguments. If None, will use 
                 ``sys.argv``. Defaults to None.
+            exit_on_error (bool, optional): If an error occurs during cli parsing, the default 
+                behavior is to print the error and exit the program. You can disable this 
+                behavior by setting this parameter to False, in which case the error will be raised. 
+                Defaults to True.
         """
         if argv is None:
             argv = sys.argv[1:]
@@ -370,12 +383,15 @@ class ExperimentGroup:
             exp_name = param_values["experiment"]
             
             if exp_name not in experiments:
-                raise parametric.ValidationError(f"Invalid experiment name '{exp_name}'.")
-        except parametric.ValidationError as e:
-            self.param_manager.print_error(e)
-            sys.exit(1)
+                raise ValueError(f"Invalid experiment name '{exp_name}'.")
+        except Exception as e:
+            if exit_on_error:
+                self.param_manager.print_error(e)
+                sys.exit(1)
+            else:
+                raise e
         
-        experiments[exp_name].cli(argv_rest)
+        experiments[exp_name].cli(argv_rest, exit_on_error=exit_on_error)
 
 
 def parameter_decorator(

@@ -48,3 +48,8 @@ class GroupHelpFormatter(parametric.CliHelpFormatter):
             if isinstance(exp, core.ExperimentGroup):
                 self._print_experiments_recursive(grid, exp.experiments, padding+1)
 
+
+class ExperimentHelpFormatter(parametric.CliHelpFormatter):
+
+    def print_error(self, error:Exception):
+        self.console.print(f"[error]Error:[/error] {error} "f"Use [flag]-h[/flag] for help.")

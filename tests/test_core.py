@@ -142,3 +142,28 @@ def test_group_nesting():
     
     with pytest.raises(ExpRan):
         group1.cli(["group2", "exp", "--param1", "value"])
+
+
+def test_cli_exit():
+    class CustomException(Exception):
+        pass
+    
+    @pystematic.parameter(
+        name="test_param",
+        required=True
+    )
+    @pystematic.parameter(
+        name="int_param",
+        type=int
+    )
+    @pystematic.experiment
+    def exp(params):
+        assert "test_param" in params
+        assert params["test_param"] == "test"
+
+        assert "int_param" in params
+        assert params["int_param"] == 3
+        raise CustomException()
+    
+    with pytest.raises(Exception):
+        exp.cli(["--int-param", "3"], exit_on_error=False)
