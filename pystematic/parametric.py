@@ -489,6 +489,9 @@ class ParameterManager:
     def get_parameters(self):
         return [c.param for c in self._parameters if not c.cli_only]
 
+    def get_cli_only_parameters(self):
+        return [c.param for c in self._parameters if c.cli_only]
+
     def get_cli_optionals(self):
         return [c.param for c in self._parameters if c.cli_enabled and not c.cli_positional]
 
@@ -539,6 +542,12 @@ class ParameterManager:
             if param.required and result_dict[param.name] is None:
                 raise ValidationError(f"Parameter '{param.name}' is required.")
 
+    def validate_cli_only_values(self, result_dict):
+        for param in self.get_cli_only_parameters():
+
+            if param.required and (param.name not in result_dict or result_dict[param.name] is None):
+                raise ValidationError(f"Parameter '{param.name}' is required.")
+
     def from_cli(self, argv=None, defaults=True, env=True):
         result_dict = ParamValueDict(self.get_parameters())
 
@@ -555,6 +564,7 @@ class ParameterManager:
         if defaults:
             self.add_defaults(result_dict)
         
+        self.validate_cli_only_values(result_dict)
         self.validate_values(result_dict)
 
         return dict(result_dict)
@@ -575,6 +585,7 @@ class ParameterManager:
         if defaults:
             self.add_defaults(result_dict)
 
+        self.validate_cli_only_values(result_dict)
         self.validate_values(result_dict)
 
         return dict(result_dict), argv_rest
