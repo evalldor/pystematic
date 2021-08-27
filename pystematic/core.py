@@ -344,9 +344,20 @@ class ExperimentGroup:
         """
         return self.param_manager.get_parameters()
 
-    def experiment(self, name=None, inherit_params=None, defaults={}):
-        """Creates an experiment and adds it to this group. See also :func:`pystematic.experiment`.
+    def experiment(self, name=None, inherit_params=None, defaults={}, inherit_params_from_group=True):
+        """Creates a new experiment that is part of this group. See also :func:`pystematic.experiment`.
+
+        Args:
+            name (str, optional): Name of the experiment. Defaults to the name of the main function.
+            inherit_params (Experiment, ExperimentGroup, List[Experiment], List[ExperimentGroup], optional): 
+                An experiment, group or a list thereof to inherit parameters from. Defaults to None.
+            defaults (dict, optional): A dict containing default values for parameters, will override any 
+                default set in the parameter declaration. Defaults to {}.
+            inherit_params_from_group (bool, optional): By default, the experiment will inherit all params 
+                registered on the group. Set this option to False to disable this behavior. Defaults to True.
         """
+
+        
         if callable(name):
             main_function = name
             name = None
@@ -359,7 +370,8 @@ class ExperimentGroup:
                 name=name, 
                 inherit_params=inherit_params, 
                 defaults=defaults, 
-                group=self
+                group=self,
+                inherit_params_from_group=inherit_params_from_group
             )
         
         return functools.partial(
@@ -367,11 +379,19 @@ class ExperimentGroup:
             name=name, 
             inherit_params=inherit_params, 
             defaults=defaults, 
-            group=self
+            group=self,
+            inherit_params_from_group=inherit_params_from_group
         )
 
-    def group(self, name=None, inherit_params=None):
+    def group(self, name=None, inherit_params=None, inherit_params_from_group=True):
         """Creates a nested group. See also :func:`pystematic.group`
+
+        Args:
+            name (str, optional): Name of the group. Defaults to the name of the annotated function.
+            inherit_params (Experiment, ExperimentGroup, List[Experiment], List[ExperimentGroup], optional): 
+                An experiment, group or a list thereof to inherit parameters from. Defaults to None.
+            inherit_params_from_group (bool, optional): By default, the subgroup will inherit all params 
+                registered on the group. Set this option to False to disable this behavior. Defaults to True.
         """
         if callable(name):
             main_function = name
@@ -384,14 +404,16 @@ class ExperimentGroup:
                 main_function, 
                 name=name, 
                 inherit_params=inherit_params, 
-                group=self
+                group=self,
+                inherit_params_from_group=inherit_params_from_group
             )
         
         return functools.partial(
             _group_constructor, 
             name=name, 
             inherit_params=inherit_params, 
-            group=self
+            group=self,
+            inherit_params_from_group=inherit_params_from_group
         )
 
     def add_experiment(self, experiment):
@@ -590,7 +612,7 @@ def group_decorator(name=None, inherit_params=None):
     return functools.partial(_group_constructor, name=name, inherit_params=inherit_params)
 
 
-def _experiment_constructor(main_function, name=None, inherit_params=None, defaults={}, group=None):
+def _experiment_constructor(main_function, name=None, inherit_params=None, defaults={}, group=None, inherit_params_from_group=True):
 
     experiment = Experiment(
         main_function=main_function, 
@@ -602,8 +624,8 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
 
     if group is not None:
         group.add_experiment(experiment)
-
-        _inherit_params(experiment, group)
+        if inherit_params_from_group:
+            _inherit_params(experiment, group)
 
     if inherit_params is not None:
         _inherit_params(experiment, inherit_params)
@@ -615,13 +637,13 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
     return experiment
 
 
-def _group_constructor(main_function, name=None, inherit_params=None, group=None):
+def _group_constructor(main_function, name=None, inherit_params=None, group=None, inherit_params_from_group=True):
     new_group = ExperimentGroup(main_function, name=name)
 
     if group is not None: # nested groups
         group.add_experiment(new_group)
-
-        _inherit_params(new_group, group)
+        if inherit_params_from_group:
+            _inherit_params(new_group, group)
 
     if inherit_params is not None:
         _inherit_params(new_group, inherit_params)
