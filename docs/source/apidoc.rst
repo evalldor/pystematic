@@ -74,6 +74,8 @@ Functions
 
 .. autofunction:: pystematic.is_subprocess
 
+.. autofunction:: pystematic.local_rank
+
 .. autofunction:: pystematic.param_matrix
 
 
