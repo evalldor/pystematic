@@ -1,3 +1,4 @@
+from operator import sub
 import wrapt
 import pathlib
 import random
@@ -92,8 +93,10 @@ class StandardApi:
         self.output_dir: pathlib.Path = wrapt.ObjectProxy(None)
         self.params_file: pathlib.Path = wrapt.ObjectProxy(None)
         self.random_gen: random.Random = wrapt.ObjectProxy(None)
+        self._num_launched_subprocesses = None
 
     def _before_experiment(self, experiment, params):
+        self._num_launched_subprocesses = 0
         self.current_experiment.__wrapped__ = experiment
         self.params.__wrapped__ = params
     
@@ -106,6 +109,7 @@ class StandardApi:
 
         if params["subprocess"]:
             logger.debug(f"Initializing subprocess...")
+            assert params["local_rank"] > 0
             self.output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
             self.params_file.__wrapped__ = pathlib.Path(params["subprocess"])
         else:
@@ -149,8 +153,9 @@ class StandardApi:
         return self.random_gen.getrandbits(nbits)
     
     def launch_subprocess(self, **additional_params) -> multiprocessing.Process:
-        """Launches a subprocess. The subprocess will have the same output
-        directory and parameters as the current process.
+        """Launches a subprocess. The subprocess will be instructed to execute
+        the main function of the currently running experiment, and have the same
+        output directory and parameters as the current process.
 
         Args:
             **additional_params: Any additional parameters that should be 
@@ -170,12 +175,19 @@ class StandardApi:
                 pystematic.launch_subprocess(random_seed=pystematic.new_seed())
 
         """
+
+        if self.is_subprocess():
+            raise AssertionError("A subprocess cannot launch further subprocesses.")
+
         subprocess_params = {name: value for name, value in self.params.items()}
 
         for name, value in additional_params.items():
             subprocess_params[name] = value
 
+        self._num_launched_subprocesses += 1
+
         subprocess_params["subprocess"] = str(self.params_file)
+        subprocess_params["local_rank"] = self._num_launched_subprocesses
 
         logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
 
@@ -206,6 +218,17 @@ class StandardApi:
             bool: Whether or not the current process is a subprocess.
         """
         return self.params["subprocess"] is not None
+
+    def local_rank(self):
+        """Returns the local rank of the current process. The master process
+        will always have rank 0, and every subprocess launched with
+        :func:`pystematic.launch_subprocess` will be assigned a new local rank
+        by incrementing an integer counter starting at 1.
+
+        Returns:
+            int: The local rank of the current process.
+        """
+        return self.params["local_rank"]
 
     def param_matrix(self, **param_values):
         """This function can be used to build parameter combinations to use when
@@ -332,6 +355,16 @@ standard_params = [
         type=pathlib.Path,
         allow_from_file=False,
         hidden=True
+    ),
+    core.Parameter(
+        name="local_rank", 
+        type=int,
+        default=0,
+        help="For multiprocessing, gives the local rank for this process. "
+            "This parameter is set automatically by the framework, and should not "
+            "be used manually.",
+        allow_from_file=False,
+        hidden=True,
     ),
 ]
 

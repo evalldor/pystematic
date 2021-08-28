@@ -360,3 +360,18 @@ def test_experiment_inherit_params_from_group():
     
     with pytest.raises(ExpRan):
         group1.cli(["group2", "exp", "--param1", "value1", "--param2", "value2", "--param3", "value3"])
+
+
+def test_launch_subprocess():
+    subprocess_exp.run({})
+
+@pystematic.experiment
+def subprocess_exp(params):
+    if not pystematic.is_subprocess():
+        procs = [pystematic.launch_subprocess() for _ in range(3)]
+
+    print(pystematic.local_rank())
+    
+    if not pystematic.is_subprocess():
+        for proc in procs:
+            proc.join()
