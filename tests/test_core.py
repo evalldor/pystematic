@@ -1,7 +1,11 @@
+import time
+
 import pytest
 import pystematic
 import pystematic.core
 from pystematic import output_dir
+
+import logging
 
 
 def _list_contains_param_with_name(param_list, *param_names):
@@ -365,13 +369,28 @@ def test_experiment_inherit_params_from_group():
 def test_launch_subprocess():
     subprocess_exp.run({})
 
+
 @pystematic.experiment
 def subprocess_exp(params):
+    logger = logging.getLogger("subprocess_exp")
     if not pystematic.is_subprocess():
         procs = [pystematic.launch_subprocess() for _ in range(3)]
 
-    print(pystematic.local_rank())
+    logger.info(pystematic.local_rank())
     
     if not pystematic.is_subprocess():
         for proc in procs:
             proc.join()
+
+
+def test_param_sweep():
+    pystematic.run_parameter_sweep(main_experiment, [{}]*5, max_num_processes=2)
+
+
+@pystematic.experiment
+def main_experiment(params):
+    logger = logging.getLogger("test_param_sweep")
+    logger.info("NEW")
+    time.sleep(0.1)
+    logger.info("END")
+

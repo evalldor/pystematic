@@ -4,6 +4,7 @@ import pathlib
 import random
 import logging
 import multiprocessing
+import multiprocessing.connection
 import datetime
 import string
 import functools
@@ -18,6 +19,7 @@ from . import yaml_wrapper as yaml
 import pystematic.core as core
 
 from .. import parametric
+import pystematic
 
 
 logger = logging.getLogger('pystematic.standard')
@@ -66,7 +68,8 @@ class StandardLogHandler(logging.Handler):
             'info':     'blue',
             'warning':  'yellow',
             'error':    'red',
-            'name':     "green"
+            'rank':     'green',
+            'name':     'green'
 
         }, inherit=False)
 
@@ -82,7 +85,11 @@ class StandardLogHandler(logging.Handler):
 
         name = f"[name]\[{record.name}][/name]"
 
-        self.console.print(f"{level} {name} {msg}")
+        if pystematic.local_rank() > 0 or pystematic.subprocess_counter > 0:
+            rank = f"[rank][RANK {pystematic.local_rank()}][/rank]"
+            self.console.print(f"{level} {rank} {name} {msg}")
+        else:
+            self.console.print(f"{level} {name} {msg}")
 
 
 class StandardApi:
@@ -93,10 +100,10 @@ class StandardApi:
         self.output_dir: pathlib.Path = wrapt.ObjectProxy(None)
         self.params_file: pathlib.Path = wrapt.ObjectProxy(None)
         self.random_gen: random.Random = wrapt.ObjectProxy(None)
-        self._num_launched_subprocesses = None
+        self.subprocess_counter: int = wrapt.ObjectProxy(0)
 
     def _before_experiment(self, experiment, params):
-        self._num_launched_subprocesses = 0
+        self.subprocess_counter = 0
         self.current_experiment.__wrapped__ = experiment
         self.params.__wrapped__ = params
     
@@ -184,10 +191,10 @@ class StandardApi:
         for name, value in additional_params.items():
             subprocess_params[name] = value
 
-        self._num_launched_subprocesses += 1
+        self.subprocess_counter += 1
 
         subprocess_params["subprocess"] = str(self.params_file)
-        subprocess_params["local_rank"] = self._num_launched_subprocesses
+        subprocess_params["local_rank"] = self.subprocess_counter
 
         logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
 
@@ -401,3 +408,4 @@ class ProcessQueue:
             
         while len(self._live_processes) > 0:
             self._wait()
+
