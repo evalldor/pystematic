@@ -55,7 +55,7 @@ jobs:
         run: poetry install
 
       - name: Tag
-        run: git tag $(poetry run python -c "import pystematic; print(f'v{pystematic.__version__}')") && git push --tags
+        run: git tag $(poetry run python -c "import importlib_metadata; print(f\"v{importlib_metadata.version('pystematic')}\")") && git push --tags
 
       - name: Build wheel
         run: poetry build -f wheel
