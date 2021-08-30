@@ -330,6 +330,9 @@ class ExperimentGroup:
             cli_only=True
         )
 
+        # Manager for handling inheritence parameters
+        self._inheritence_param_manager = parametric.ParameterManager()
+
     def add_parameter(self, param):
         """Adds a parameter to this group. Usually not used directly, but
         via the :func:`pystematic.parameter` decorator.
@@ -337,12 +340,12 @@ class ExperimentGroup:
         Args:
             param (Parameter): The parameter to add.
         """
-        self.param_manager.add_parameter(param)
+        self._inheritence_param_manager.add_parameter(param)
 
     def get_parameters(self):
         """Returns a list of all parameters registered with this group.
         """
-        return self.param_manager.get_parameters()
+        return self._inheritence_param_manager.get_parameters()
 
     def experiment(self, name=None, inherit_params=None, defaults={}, inherit_params_from_group=True):
         """Creates a new experiment that is part of this group. See also :func:`pystematic.experiment`.
@@ -668,7 +671,7 @@ def _inherit_params(experiment, inherit_from):
 
     for exp in experiments_to_inherit_from:
         if isinstance(exp, (Experiment, ExperimentGroup)):
-            for param in exp.param_manager.get_parameters():
+            for param in exp.get_parameters():
                 if param.name not in existing_params:
                     experiment.add_parameter(param)
         elif hasattr(exp, "__params_memo__"):

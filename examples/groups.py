@@ -1,5 +1,8 @@
 import pystematic as ps
 
+@ps.parameter(
+    name="group_param"
+)
 @ps.group
 def my_group():
     pass
