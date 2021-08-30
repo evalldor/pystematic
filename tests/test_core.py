@@ -79,6 +79,8 @@ def test_params_are_added():
     with pytest.raises(CustomException):
         exp.run({"test_param": "test", "int_param": 3})
 
+
+def test_duplicate_parameter_definition_raises_exception():
     with pytest.raises(Exception):
         @pystematic.parameter(
             name="param1"
@@ -234,7 +236,7 @@ def test_cli_exit():
         exp.cli(["--int-param", "3"], exit_on_error=False)
 
 
-def test_experiment_nesting():
+def test_experiment_nesting_raises_exception():
 
 
     @pystematic.parameter(
@@ -367,11 +369,11 @@ def test_experiment_inherit_params_from_group():
 
 
 def test_launch_subprocess():
-    subprocess_exp.run({})
+    _subprocess_exp.run({})
 
 
 @pystematic.experiment
-def subprocess_exp(params):
+def _subprocess_exp(params):
     logger = logging.getLogger("subprocess_exp")
     if not pystematic.is_subprocess():
         procs = [pystematic.launch_subprocess() for _ in range(3)]
@@ -384,11 +386,11 @@ def subprocess_exp(params):
 
 
 def test_param_sweep():
-    pystematic.run_parameter_sweep(main_experiment, [{}]*5, max_num_processes=2)
+    pystematic.run_parameter_sweep(_sweep_exp, [{}]*5, max_num_processes=2)
 
 
 @pystematic.experiment
-def main_experiment(params):
+def _sweep_exp(params):
     logger = logging.getLogger("test_param_sweep")
     logger.info("NEW")
     time.sleep(0.1)

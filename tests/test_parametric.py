@@ -293,3 +293,13 @@ def test_parse_shared():
     assert rest == ["--string-param", "next", "pos_val_2"]
     assert res["multiple_str"] == ["one", "two"]
     assert res["pos_1"] == "pos_value"
+
+def test_negative_integers():
+    params = parametric.ParameterManager()
+    params.add_param(
+            name="pos_1",
+            type=float
+        )
+
+    res = params.from_cli(["--pos-1", "-1"])
+    assert res["pos_1"] == -1

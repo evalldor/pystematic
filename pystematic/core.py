@@ -6,7 +6,6 @@ import typing
 import typing_extensions
 import importlib_metadata
 import logging
-import collections
 
 from . import parametric
 from . import cli_help_formatters
@@ -306,6 +305,7 @@ def _run_experiment_by_name(experiment_module, experiment_name, params):
     # used by Experiment.run_in_new_process
     module = importlib.import_module(experiment_module)
     getattr(module, experiment_name).run(params)
+
 
 class ExperimentGroup:
     """Use when you have many experiments and want to group them in some way.

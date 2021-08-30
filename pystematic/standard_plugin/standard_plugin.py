@@ -326,25 +326,25 @@ standard_params = [
     core.Parameter(
         name="output_dir",
         default="./output",
-        help="Parent directory to store all run-logs in. Will be created if it does not exist.",
+        help="Parent directory to store all run-logs in. Will be created if it "
+        "does not exist.",
         type=str
     ),
     core.Parameter(
         name="debug",
         default=False,
-        help="Sets debug flag on/off. Configures the python logging mechanism to print all DEBUG messages.",
+        help="Sets debug flag on/off. Configures the python logging mechanism to "
+        "print all DEBUG messages.",
         type=bool,
         is_flag=True
     ),
     core.Parameter(
         name="params_file",
         type=pathlib.Path,
-        help=inspect.cleandoc(
-            """Read experiment parameters from a yaml file, such as the one
-            dumped in the output dir from an eariler run. When this option is
-            set from the command line, any other options supplied AFTER this one
-            will override the ones loaded from the file."""
-        ),
+        help="Read experiment parameters from a yaml file, such as the one "
+        "dumped in the output dir from an eariler run. When this option is "
+        "set from the command line, any other options supplied AFTER this one "
+        "will override the ones loaded from the file.",
         behaviour=ParamsFileBehaviour(),
         allow_from_file=False
     ),
@@ -358,7 +358,8 @@ standard_params = [
     core.Parameter(
         name="subprocess",
         default=None,
-        help="Internally used to indicate that this process is a subprocess. DO NOT USE MANUALLY.",
+        help="Internally used to indicate that this process is a subprocess. "
+        "DO NOT USE MANUALLY.",
         type=pathlib.Path,
         allow_from_file=False,
         hidden=True
