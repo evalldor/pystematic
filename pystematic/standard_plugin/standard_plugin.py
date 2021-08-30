@@ -194,7 +194,7 @@ class StandardApi:
         self.subprocess_counter += 1
 
         subprocess_params["subprocess"] = str(self.params_file)
-        subprocess_params["local_rank"] = self.subprocess_counter
+        subprocess_params["local_rank"] = int(self.subprocess_counter)
 
         logger.debug(f"Launching subprocess with arguments '{' '.join(subprocess_params)}'.")
 
