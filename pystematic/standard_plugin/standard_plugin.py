@@ -103,7 +103,7 @@ class StandardApi:
         self.subprocess_counter: int = wrapt.ObjectProxy(0)
 
     def _before_experiment(self, experiment, params):
-        self.subprocess_counter = 0
+        self.subprocess_counter.__wrapped__ = 0
         self.current_experiment.__wrapped__ = experiment
         self.params.__wrapped__ = params
     
