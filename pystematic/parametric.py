@@ -16,7 +16,7 @@ Clear cut, interceptable stages:
 
 Motivation: 
 
-A number of shortcommings in existing argparsing libs motivated the creation of
+A number of shortcomings in existing argparsing libs motivated the creation of
 this lib. More specifically; handling many different sources of parameter
 values, custom help text formatting, extensibility. 
 
@@ -172,6 +172,10 @@ class Parameter:
 
         behaviour: DefaultParameterBehaviour = None,
 
+        cli_only: bool = False, 
+        cli_positional: bool = False, 
+        cli_enabled: bool = True,
+
         **extension_attributes
     ):
 
@@ -241,6 +245,9 @@ class Parameter:
         if behaviour is None:
             behaviour = DefaultParameterBehaviour()
 
+        if cli_only and not cli_enabled:
+            raise ValueError("'cli_only' and 'cli_enabled' may not be contradictive.")
+
         self.name = name
         self.flags = flags
         self.type = type
@@ -255,6 +262,10 @@ class Parameter:
         self.metavar = metavar
 
         self.behaviour = behaviour
+
+        self.cli_only = cli_only
+        self.cli_positional = cli_positional
+        self.cli_enabled = cli_enabled
 
         self.behaviour.after_init(self, **extension_attributes)
 
@@ -358,84 +369,25 @@ class ParamValueDict(collections.UserDict):
             raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
 
 
-@dataclasses.dataclass
-class _ParamContainer:
-    """Used to store some config together with a param
-    """
-    param: Parameter = None
-    cli_enabled: bool = True
-    cli_only: bool = False
-    cli_positional: bool = False
-
-
 class ParameterGroup:
-
-    def __init__(self, name, param_manager):
-        self._parameters: list[_ParamContainer] = []
-
-    def add_parameter(self):
-        pass
-
-    def add_parameters(self):
-        pass
-
-    def add_param(self):
-        pass
-
-
-class ParameterManager:
-    """The Parameter Manager essentialy consists of a set of parameters, and a
-    set of operations to perform with those paramters, such as parsing them from
-    cli, etc.
+    """Container for a set of related parameters. A parameter can belong to more
+    than one group.
     """
-    def __init__(
-        self, 
-        defaults_override={}, 
-        env_prefix=None, 
-        env_value_separators=":,",
-        cli_help_formatter=None,
-        add_cli_help_option=True,
-    ) -> None:
 
-        self._parameters: list[_ParamContainer] = []
+    def __init__(self, param_manager, name, help):
+        self._param_manager = param_manager
+        self._parameters: list[Parameter] = []
 
-        self.defaults_override = defaults_override
+        self.name = name
+        self.help = help
 
-        self.env_prefix = env_prefix
-        self.env_value_separators = env_value_separators
+    def add_parameter(self, param: Parameter):
+        
+        if param not in self._param_manager._parameters:
+            self._param_manager.add_parameter(param)
 
-        self.cli_help_formatter = cli_help_formatter or CliHelpFormatter()
-
-        if add_cli_help_option:
-            self.add_param(
-                name="__help__", 
-                flags=["-h", "--help"],
-                nargs=0,
-                help="Show this help message and exit.",
-                behaviour=CliHelpBehaviour(self),
-                cli_only=True
-            )
-
-    def add_parameter(self, param:Parameter, cli_only=False, cli_positional=False, cli_enabled=True):
-        if cli_only and not cli_enabled:
-            raise ValueError("'cli_only' and 'cli_enabled' may not be contradictive.")
-
-        for existing_param in self.get_all_parameters():
-            if existing_param.name == param.name:
-                raise ValueError(f"Error when adding parameter '{param.name}': a parameter with the same name "
-                                  "has already been added.")
-            
-            clashing_flags = set(existing_param.flags).intersection(param.flags)
-            if len(clashing_flags) > 0:
-                raise ValueError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
-                                 f"also has flags '{clashing_flags}'.")
-
-        self._parameters.append(_ParamContainer(
-            param=param,
-            cli_enabled=cli_enabled,
-            cli_positional=cli_positional,
-            cli_only=cli_only
-        ))
+        if param not in self._parameters:    
+            self._parameters.append(param)
 
     def add_param(
         self,
@@ -454,9 +406,9 @@ class ParameterManager:
         
         behaviour: DefaultParameterBehaviour = None,
         
-        cli_only=False, 
-        cli_positional=False, 
-        cli_enabled=True,
+        cli_only: bool = False, 
+        cli_positional: bool = False, 
+        cli_enabled: bool = True,
 
         **kwargs
     ):
@@ -476,27 +428,149 @@ class ParameterManager:
             
             behaviour=behaviour,
             
+            cli_only=cli_only,
+            cli_positional=cli_positional,
+            cli_enabled=cli_enabled,
+
             **kwargs
         )
 
-        self.add_parameter(param, cli_only, cli_positional, cli_enabled)
+        self.add_parameter(param)
 
         return param
 
+
+class ParameterManager:
+    """The Parameter Manager essentialy consists of a set of parameters, and a
+    set of operations to perform with those paramters, such as parsing them from
+    cli.
+    """
+    def __init__(
+        self, 
+        defaults_override={}, 
+        env_prefix: str = None, 
+        env_value_separators: str = ":,",
+        cli_help_formatter = None,
+        add_cli_help_option: bool = True,
+    ) -> None:
+
+        self._parameters: list[Parameter] = []
+        self._groups: list[ParameterGroup] = []
+
+        self.defaults_override = defaults_override
+
+        self.env_prefix = env_prefix
+        self.env_value_separators = env_value_separators
+
+        self.cli_help_formatter = cli_help_formatter or CliHelpFormatter()
+
+        if add_cli_help_option:
+            self.add_param(
+                name="__help__", 
+                flags=["-h", "--help"],
+                nargs=0,
+                help="Show this help message and exit.",
+                behaviour=CliHelpBehaviour(self),
+                cli_only=True
+            )
+
+
+    def add_parameter(self, param: Parameter):
+        
+        for existing_param in self._parameters:
+            if existing_param.name == param.name:
+                raise ValueError(f"Error when adding parameter '{param.name}': a parameter with the same name "
+                                  "has already been added.")
+            
+            clashing_flags = set(existing_param.flags).intersection(param.flags)
+            if len(clashing_flags) > 0:
+                raise ValueError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
+                                 f"also has flags '{clashing_flags}'.")
+
+        self._parameters.append(param)
+
+    def add_param(
+        self,
+        name: str,
+        flags: typing.Union[None, typing.List[str], str] = None,
+        type: typing.Callable[[str], typing.Any] = str,
+        nargs: typing.Union[typing_extensions.Literal["?"], typing_extensions.Literal["*"], typing_extensions.Literal["+"], int, None] = None,
+        default: typing.Union[typing.Any, typing.Callable[[], typing.Any], None] = None,
+        required: bool = False,
+        envvar: typing.Optional[str] = None,
+
+        help: typing.Optional[str] = None,
+        default_help: typing.Optional[str] = None,
+        hidden: bool = False,
+        metavar: typing.Optional[str] = None,
+        
+        behaviour: DefaultParameterBehaviour = None,
+        
+        cli_only: bool = False, 
+        cli_positional: bool = False, 
+        cli_enabled: bool = True,
+
+        **kwargs
+    ):
+        param = Parameter(
+            name=name,
+            flags=flags,
+            type=type,
+            nargs=nargs,
+            default=default,
+            required=required,
+            envvar=envvar,
+
+            help=help,
+            default_help=default_help,
+            hidden=hidden,
+            metavar=metavar,
+            
+            behaviour=behaviour,
+            
+            cli_only=cli_only,
+            cli_positional=cli_positional,
+            cli_enabled=cli_enabled,
+
+            **kwargs
+        )
+
+        self.add_parameter(param)
+
+        return param
+
+    def add_group(self, name, help):
+
+        for existing_group in self._groups:
+            if existing_group.name == name:
+                raise ValueError(f"Error when adding group '{name}': a group with that name has already been added.")
+
+        group = ParameterGroup(name, help)
+
+        self._groups.append(group)
+
+        return group
+
+    def get_groups(self):
+        return list(self._groups)
+
+    def get_all_parameters_not_in_any_group(self):
+        return list(set(self._parameters).difference([group._param_manager for group in self._groups]))
+
     def get_all_parameters(self):
-        return [c.param for c in self._parameters]
+        return list(self._parameters)
 
     def get_parameters(self):
-        return [c.param for c in self._parameters if not c.cli_only]
+        return [param for param in self._parameters if not param.cli_only]
 
     def get_cli_only_parameters(self):
-        return [c.param for c in self._parameters if c.cli_only]
+        return [param for param in self._parameters if param.cli_only]
 
     def get_cli_optionals(self):
-        return [c.param for c in self._parameters if c.cli_enabled and not c.cli_positional]
+        return [param for param in self._parameters if param.cli_enabled and not param.cli_positional]
 
     def get_cli_positionals(self):
-        return [c.param for c in self._parameters if c.cli_enabled and c.cli_positional]
+        return [param for param in self._parameters if param.cli_enabled and param.cli_positional]
 
 
     def add_defaults(self, result_dict):
@@ -535,11 +609,10 @@ class ParameterManager:
 
 
     def validate_values(self, result_dict):
-        for param in [c.param for c in self._parameters if not c.cli_only]:
+        for param in self.get_parameters():
             if param.name not in result_dict:
                 raise ValidationError(f"Missing value for param '{param.name}'.")
-        
-        for param in [c.param for c in self._parameters]:
+
             if param.required and result_dict[param.name] is None:
                 raise ValidationError(f"Parameter '{param.name}' is required.")
 
@@ -619,7 +692,6 @@ from rich.theme import Theme
 class CliHelpFormatter:
 
     def __init__(self, no_style=False) -> None:
-       
 
         if no_style:
             theme = Theme({}, inherit=False)
@@ -630,7 +702,7 @@ class CliHelpFormatter:
                 "heading": "bold",
                 "flag": "cyan",
                 "help_heading": "bold",
-                "default_value": "white",
+                "default_value": "bold",
                 "error": "bold red"
 
             }, inherit=False)
@@ -648,11 +720,11 @@ class CliHelpFormatter:
 
     def print_help(self, positionals, optionals):
         self.print_usage(positionals, optionals)
-        print()
+        self.console.print()
 
         if len(positionals) > 0:
             self._print_positionals_help(positionals)
-            print()
+            self.console.print()
         
         if len(optionals) > 0:
             self._print_optionals_help(optionals)

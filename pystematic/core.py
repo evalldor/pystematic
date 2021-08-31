@@ -326,8 +326,7 @@ class ExperimentGroup:
             name="experiment",
             help="The name of the experiment to run.",
             required=True,
-            cli_positional=True,
-            cli_only=True
+            cli_positional=True
         )
 
         # Manager for handling inheritence parameters
