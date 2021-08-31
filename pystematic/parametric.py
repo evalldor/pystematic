@@ -389,6 +389,9 @@ class ParameterGroup:
         if param not in self._parameters:    
             self._parameters.append(param)
 
+    def get_parameters(self):
+        return [param for param in self._parameters if not param.cli_only]
+
     def add_param(
         self,
         name: str,

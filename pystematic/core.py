@@ -230,13 +230,17 @@ class Experiment:
     def add_param_group(self, param_group):
         group = self.param_manager.add_group(param_group.name, param_group.help)
 
-        
+        for param in group.parameters:
+            group.add_parameter(param)
                 
 
     def get_parameters(self):
         """Returns a list of all parameters registered with this experiment.
         """
         return self.param_manager.get_parameters()
+
+    def get_param_groups(self):
+        self.param_manager.get_groups()
 
     def __call__(self, params):
         return self.run(params)
@@ -484,6 +488,8 @@ class ParameterGroup:
             for param in dummy.__params_memo__:
                 self.parameters.append(param)
 
+    def get_parameter(self):
+        return self.parameters
 
 def parameter_decorator(
     name: str,
@@ -716,6 +722,7 @@ def _inherit_params(experiment, inherit_from):
     """Adds all parameters to experiment from experiments or groups listed in
     inherit_from."""
 
+    existing_param_groups = [group.name for group in experiment.get_param_groups()]
     existing_params = [param.name for param in experiment.get_parameters()]
 
     if not isinstance(inherit_from, (tuple, list)):
@@ -725,12 +732,26 @@ def _inherit_params(experiment, inherit_from):
 
     for exp in experiments_to_inherit_from:
         if isinstance(exp, (Experiment, ExperimentGroup)):
+            for group in exp.get_param_groups():
+                if group.name not in existing_param_groups:
+                    experiment.add_param_group(group)
+                    
             for param in exp.get_parameters():
                 if param.name not in existing_params:
                     experiment.add_parameter(param)
+                    
         elif hasattr(exp, "__params_memo__"):
+            
             for param in exp.__params_memo__:
-                if param.name not in existing_params:
-                    experiment.add_parameter(param)
+                if isinstance(param, Parameter):
+                    if param.name not in existing_params:
+                        experiment.add_parameter(param)
+                elif isinstance(param, ParameterGroup):
+                    if param.name not in existing_param_groups:
+                        experiment.add_param_group(param)
+                else:
+                    raise ValueError(f"Unrecognized value '{param}' found in parameter "
+                                    f"list of function '{exp.__name__}'.")
+                
         else:
             raise ValueError(f"Unknown value passed to 'inherit_params': {exp}")
