@@ -371,7 +371,7 @@ class _ParamContainer:
 class ParameterGroup:
 
     def __init__(self, name, param_manager):
-        pass
+        self._parameters: list[_ParamContainer] = []
 
     def add_parameter(self):
         pass
@@ -535,17 +535,12 @@ class ParameterManager:
 
 
     def validate_values(self, result_dict):
-        for param in self.get_parameters():
+        for param in [c.param for c in self._parameters if not c.cli_only]:
             if param.name not in result_dict:
                 raise ValidationError(f"Missing value for param '{param.name}'.")
-            
+        
+        for param in [c.param for c in self._parameters]:
             if param.required and result_dict[param.name] is None:
-                raise ValidationError(f"Parameter '{param.name}' is required.")
-
-    def validate_cli_only_values(self, result_dict):
-        for param in self.get_cli_only_parameters():
-
-            if param.required and (param.name not in result_dict or result_dict[param.name] is None):
                 raise ValidationError(f"Parameter '{param.name}' is required.")
 
     def from_cli(self, argv=None, defaults=True, env=True):
@@ -564,7 +559,6 @@ class ParameterManager:
         if defaults:
             self.add_defaults(result_dict)
         
-        self.validate_cli_only_values(result_dict)
         self.validate_values(result_dict)
 
         return dict(result_dict)
@@ -585,7 +579,6 @@ class ParameterManager:
         if defaults:
             self.add_defaults(result_dict)
 
-        self.validate_cli_only_values(result_dict)
         self.validate_values(result_dict)
 
         return dict(result_dict), argv_rest
@@ -746,7 +739,7 @@ class CliHelpFormatter:
 ParseResult = collections.namedtuple("ParseResult", ["arg", "flag", "value"])
 
 
-class ParseError(ValueError):
+class ParseError(BaseError):
     pass
 
 
