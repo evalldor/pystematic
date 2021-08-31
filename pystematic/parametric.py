@@ -539,13 +539,13 @@ class ParameterManager:
 
         return param
 
-    def add_group(self, name, help):
+    def add_group(self, name, help=None):
 
         for existing_group in self._groups:
             if existing_group.name == name:
                 raise ValueError(f"Error when adding group '{name}': a group with that name has already been added.")
 
-        group = ParameterGroup(name, help)
+        group = ParameterGroup(self, name, help)
 
         self._groups.append(group)
 

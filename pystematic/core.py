@@ -227,6 +227,12 @@ class Experiment:
         """
         self.param_manager.add_parameter(param)
 
+    def add_param_group(self, param_group):
+        group = self.param_manager.add_group(param_group.name, param_group.help)
+
+        
+                
+
     def get_parameters(self):
         """Returns a list of all parameters registered with this experiment.
         """
@@ -460,6 +466,25 @@ class ExperimentGroup:
         experiments[exp_name].cli(argv_rest, exit_on_error=exit_on_error)
 
 
+class ParameterGroup:
+
+    def __init__(self, name, help, *parameter_decorators):
+        self.name = name
+        self.help = help
+        self.parameters = []
+
+        if len(parameter_decorators) > 0:
+
+            def dummy():
+                pass
+
+            for decorator in parameter_decorators:
+                decorator(dummy)
+
+            for param in dummy.__params_memo__:
+                self.parameters.append(param)
+
+
 def parameter_decorator(
     name: str,
     type: typing.Callable[[str], typing.Any] = str,
@@ -617,7 +642,17 @@ def group_decorator(name=None, inherit_params=None):
 def parameter_group_decorator(name, *parameters, help=None):
 
     def decorator(experiment):
-        pass
+        group = ParameterGroup(name, help, *parameters)
+
+        if isinstance(experiment, (Experiment, ExperimentGroup)):
+            experiment.add_param_group(group)
+        else:
+            if not hasattr(experiment, "__params_memo__"):
+                experiment.__params_memo__ = []
+            
+            experiment.__params_memo__.append(group)
+
+        return experiment
 
 
     return decorator
@@ -642,7 +677,13 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
 
     if hasattr(main_function, "__params_memo__"):
         for param in main_function.__params_memo__:
-            experiment.add_parameter(param)
+            if isinstance(param, Parameter):
+                experiment.add_parameter(param)
+            elif isinstance(param, ParameterGroup):
+                experiment.add_param_group(param)
+            else:
+                raise ValueError(f"Unrecognized value '{param}' found in parameter "
+                                f"list of main function '{main_function.__name__}'.")
 
     return experiment
 
@@ -660,7 +701,13 @@ def _group_constructor(main_function, name=None, inherit_params=None, group=None
 
     if hasattr(main_function, "__params_memo__"):
         for param in main_function.__params_memo__:
-            new_group.add_parameter(param)
+            if isinstance(param, Parameter):
+                new_group.add_parameter(param)
+            elif isinstance(param, ParameterGroup):
+                new_group.add_param_group(param)
+            else:
+                raise ValueError(f"Unrecognized value '{param}' found in parameter "
+                                f"list of main function '{main_function.__name__}'.")
 
     return new_group
 
