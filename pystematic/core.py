@@ -614,6 +614,14 @@ def group_decorator(name=None, inherit_params=None):
     return functools.partial(_group_constructor, name=name, inherit_params=inherit_params)
 
 
+def parameter_group_decorator(name, *parameters, help=None):
+
+    def decorator(experiment):
+        pass
+
+
+    return decorator
+
 def _experiment_constructor(main_function, name=None, inherit_params=None, defaults={}, group=None, inherit_params_from_group=True):
 
     experiment = Experiment(
