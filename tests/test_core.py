@@ -368,6 +368,194 @@ def test_experiment_inherit_params_from_group():
         group1.cli(["group2", "exp", "--param1", "value1", "--param2", "value2", "--param3", "value3"])
 
 
+def test_param_groups():
+
+    class ExpRan(Exception):
+        pass
+
+    @pystematic.param_group("agroup",
+        pystematic.parameter(
+            name="param2"
+        ),
+        pystematic.parameter(
+            name="param3"
+        )
+    )
+    @pystematic.parameter(
+        name="param1"
+    )
+    @pystematic.experiment
+    def exp(params):
+        assert params["param1"] == "value1"
+        assert params["param2"] == "value2"
+        assert params["param3"] == "value3"
+        raise ExpRan()
+
+    with pytest.raises(ExpRan):
+        exp.run({
+            "param1": "value1",
+            "param2": "value2",
+            "param3": "value3",
+        })
+
+    with pytest.raises(ExpRan):
+        exp.cli(["--param1", "value1", "--param2", "value2", "--param3", "value3"])
+
+
+def test_param_group_inheritence():
+    class ExpRan(Exception):
+        pass
+
+    @pystematic.parameter(
+        name="param1"
+    )
+    @pystematic.param_group(
+        "param_group1",
+        pystematic.parameter(
+            name="param11"
+        ),
+        pystematic.parameter(
+            name="param12"
+        )
+    )
+    @pystematic.group
+    def group1(params):
+        pass
+
+    @pystematic.param_group(
+        "param_group2",
+        pystematic.parameter(
+            name="param21"
+        ),
+        pystematic.parameter(
+            name="param22"
+        )
+    )
+    @pystematic.parameter(
+        name="param2"
+    )
+    @group1.group
+    def group2(params):
+        pass
+
+    @pystematic.param_group(
+        "param_group3",
+        pystematic.parameter(
+            name="param31"
+        ),
+        pystematic.parameter(
+            name="param32"
+        )
+    )
+    @pystematic.parameter(
+        name="param3"
+    )
+    @group2.experiment
+    def exp(params):
+        assert params["param1"] == "value1"
+        assert params["param2"] == "value2"
+        assert params["param3"] == "value3"
+
+        assert params["param11"] == "value1"
+        assert params["param12"] == "value2"
+
+        assert params["param21"] == "value1"
+        assert params["param22"] == "value2"
+
+        assert params["param31"] == "value1"
+        assert params["param32"] == "value2"
+
+
+        raise ExpRan()
+
+    assert _list_contains_param_with_name(
+        exp.get_parameters(), 
+        "param1", "param2", "param3", "param11", "param12", "param21", "param22", "param31", "param32"
+        )
+    
+    with pytest.raises(ExpRan):
+        group1.cli(["group2", "exp", 
+                    "--param1", "value1", "--param2", "value2", "--param3", "value3",
+                    "--param11", "value1", "--param12", "value2",
+                    "--param21", "value1", "--param22", "value2",
+                    "--param31", "value1", "--param32", "value2"])
+
+
+def test_param_group_duplicates():
+    with pytest.raises(Exception):
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        @pystematic.parameter(
+            name="param1"
+        )
+        @pystematic.experiment
+        def exp(params):
+            pass
+
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        @pystematic.experiment
+        def exp(params):
+            pass
+
+    with pytest.raises(Exception):
+
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        @pystematic.experiment
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        def exp(params):
+            pass
+
+    with pytest.raises(Exception):
+
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        @pystematic.experiment
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param2"
+            ),
+        )
+        def exp(params):
+            pass
+
+    with pytest.raises(Exception):
+
+        @pystematic.param_group("agroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        @pystematic.experiment
+        @pystematic.param_group("bgroup",
+            pystematic.parameter(
+                name="param1"
+            ),
+        )
+        def exp(params):
+            pass
+
 def test_launch_subprocess():
     _subprocess_exp.run({})
 

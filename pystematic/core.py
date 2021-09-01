@@ -9,6 +9,7 @@ import logging
 
 from . import parametric
 from . import cli_help_formatters
+import pystematic
 
 logger = logging.getLogger("pystematic.core")
 
@@ -227,20 +228,16 @@ class Experiment:
         """
         self.param_manager.add_parameter(param)
 
-    def add_param_group(self, param_group):
-        group = self.param_manager.add_group(param_group.name, param_group.help)
-
-        for param in group.parameters:
-            group.add_parameter(param)
-                
-
     def get_parameters(self):
         """Returns a list of all parameters registered with this experiment.
         """
         return self.param_manager.get_parameters()
 
+    def add_param_group(self, param_group):
+        self.param_manager.add_group(param_group)  
+
     def get_param_groups(self):
-        self.param_manager.get_groups()
+        return self.param_manager.get_groups()
 
     def __call__(self, params):
         return self.run(params)
@@ -356,6 +353,12 @@ class ExperimentGroup:
         """
         return self._inheritence_param_manager.get_parameters()
 
+    def add_param_group(self, param_group):
+        self._inheritence_param_manager.add_group(param_group)  
+
+    def get_param_groups(self):
+        return self._inheritence_param_manager.get_groups()
+
     def experiment(self, name=None, inherit_params=None, defaults={}, inherit_params_from_group=True):
         """Creates a new experiment that is part of this group. See also :func:`pystematic.experiment`.
 
@@ -368,8 +371,6 @@ class ExperimentGroup:
             inherit_params_from_group (bool, optional): By default, the experiment will inherit all params 
                 registered on the group. Set this option to False to disable this behavior. Defaults to True.
         """
-
-        
         if callable(name):
             main_function = name
             name = None
@@ -470,12 +471,10 @@ class ExperimentGroup:
         experiments[exp_name].cli(argv_rest, exit_on_error=exit_on_error)
 
 
-class ParameterGroup:
+class ParameterGroup(parametric.OptionGroup):
 
-    def __init__(self, name, help, *parameter_decorators):
-        self.name = name
-        self.help = help
-        self.parameters = []
+    def __init__(self, name, help, parameter_decorators):
+        parameters = []
 
         if len(parameter_decorators) > 0:
 
@@ -486,10 +485,9 @@ class ParameterGroup:
                 decorator(dummy)
 
             for param in dummy.__params_memo__:
-                self.parameters.append(param)
+                parameters.append(param)
 
-    def get_parameter(self):
-        return self.parameters
+        super().__init__(name, help, parameters)
 
 def parameter_decorator(
     name: str,
@@ -648,7 +646,7 @@ def group_decorator(name=None, inherit_params=None):
 def parameter_group_decorator(name, *parameters, help=None):
 
     def decorator(experiment):
-        group = ParameterGroup(name, help, *parameters)
+        group = ParameterGroup(name, help, parameters)
 
         if isinstance(experiment, (Experiment, ExperimentGroup)):
             experiment.add_param_group(group)
@@ -663,6 +661,7 @@ def parameter_group_decorator(name, *parameters, help=None):
 
     return decorator
 
+
 def _experiment_constructor(main_function, name=None, inherit_params=None, defaults={}, group=None, inherit_params_from_group=True):
 
     experiment = Experiment(
@@ -674,22 +673,16 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
     experiment = app.experiment_created(experiment)
 
     if group is not None:
+
         group.add_experiment(experiment)
+
         if inherit_params_from_group:
             _inherit_params(experiment, group)
 
     if inherit_params is not None:
         _inherit_params(experiment, inherit_params)
 
-    if hasattr(main_function, "__params_memo__"):
-        for param in main_function.__params_memo__:
-            if isinstance(param, Parameter):
-                experiment.add_parameter(param)
-            elif isinstance(param, ParameterGroup):
-                experiment.add_param_group(param)
-            else:
-                raise ValueError(f"Unrecognized value '{param}' found in parameter "
-                                f"list of main function '{main_function.__name__}'.")
+    _read_params_memo(main_function, experiment)
 
     return experiment
 
@@ -698,32 +691,38 @@ def _group_constructor(main_function, name=None, inherit_params=None, group=None
     new_group = ExperimentGroup(main_function, name=name)
 
     if group is not None: # nested groups
+
         group.add_experiment(new_group)
+
         if inherit_params_from_group:
             _inherit_params(new_group, group)
 
     if inherit_params is not None:
         _inherit_params(new_group, inherit_params)
 
-    if hasattr(main_function, "__params_memo__"):
-        for param in main_function.__params_memo__:
-            if isinstance(param, Parameter):
-                new_group.add_parameter(param)
-            elif isinstance(param, ParameterGroup):
-                new_group.add_param_group(param)
-            else:
-                raise ValueError(f"Unrecognized value '{param}' found in parameter "
-                                f"list of main function '{main_function.__name__}'.")
+    _read_params_memo(main_function, new_group)
 
     return new_group
 
+
+def _read_params_memo(function, experiment_or_group):
+
+    if hasattr(function, "__params_memo__"):
+        for param in function.__params_memo__:
+            if isinstance(param, Parameter):
+                experiment_or_group.add_parameter(param)
+            elif isinstance(param, ParameterGroup):
+                experiment_or_group.add_param_group(param)
+            else:
+                raise ValueError(f"Unrecognized value '{param}' found in parameter "
+                                f"list of main function '{function.__name__}'.")
+    
 
 def _inherit_params(experiment, inherit_from):
     """Adds all parameters to experiment from experiments or groups listed in
     inherit_from."""
 
     existing_param_groups = [group.name for group in experiment.get_param_groups()]
-    existing_params = [param.name for param in experiment.get_parameters()]
 
     if not isinstance(inherit_from, (tuple, list)):
         experiments_to_inherit_from = [inherit_from]
@@ -737,14 +736,14 @@ def _inherit_params(experiment, inherit_from):
                     experiment.add_param_group(group)
                     
             for param in exp.get_parameters():
-                if param.name not in existing_params:
+                if param.name not in [param.name for param in experiment.get_parameters()]:
                     experiment.add_parameter(param)
-                    
+
         elif hasattr(exp, "__params_memo__"):
             
             for param in exp.__params_memo__:
                 if isinstance(param, Parameter):
-                    if param.name not in existing_params:
+                    if param.name not in [param.name for param in experiment.get_parameters()]:
                         experiment.add_parameter(param)
                 elif isinstance(param, ParameterGroup):
                     if param.name not in existing_param_groups:
