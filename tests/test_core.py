@@ -469,8 +469,9 @@ def test_param_group_inheritence():
         raise ExpRan()
 
     assert _list_contains_param_with_name(
-        exp.get_parameters(), 
-        "param1", "param2", "param3", "param11", "param12", "param21", "param22", "param31", "param32"
+            exp.get_parameters(), 
+            "param1", "param2", "param3", "param11", "param12", 
+            "param21", "param22", "param31", "param32"
         )
     
     with pytest.raises(ExpRan):
@@ -479,6 +480,59 @@ def test_param_group_inheritence():
                     "--param11", "value1", "--param12", "value2",
                     "--param21", "value1", "--param22", "value2",
                     "--param31", "value1", "--param32", "value2"])
+
+
+    
+    @pystematic.param_group("param_group1",
+        pystematic.parameter(
+            name="param1"
+        ),
+    )
+    @pystematic.group
+    def group1(params):
+        pass
+    
+    with pytest.raises(Exception):
+        @pystematic.parameter(
+            name="param1"
+        )
+        @group1.experiment
+        def exp(params):
+            pass
+
+    with pytest.raises(Exception):
+        @group1.experiment
+        @pystematic.parameter(
+            name="param1"
+        )
+        def exp(params):
+            pass
+
+
+def test_group_multiple_inheritence():
+    @pystematic.param_group("group_a",
+        pystematic.parameter(
+            name="param1"
+        ),
+    )
+    @pystematic.experiment
+    def exp1(params):
+        pass
+
+    @pystematic.param_group("group_b",
+        pystematic.parameter(
+            name="param1"
+        ),
+    )
+    @pystematic.experiment
+    def exp2(params):
+        pass
+
+
+    with pytest.raises(Exception):
+        @pystematic.experiment(inherit_params=[exp1, exp2])
+        def exp3(params):
+            pass
 
 
 def test_param_group_duplicates():
@@ -555,6 +609,7 @@ def test_param_group_duplicates():
         )
         def exp(params):
             pass
+
 
 def test_launch_subprocess():
     _subprocess_exp.run({})
