@@ -374,10 +374,10 @@ class OptionGroup:
     than one group.
     """
 
-    def __init__(self, name, help=None, parameters: list[Parameter] = []):
+    def __init__(self, name, help=None, parameters: typing.List[Parameter] = []):
         self.name = name
         self.help = help
-        self._parameters: list[Parameter] = []
+        self._parameters: typing.List[Parameter] = []
 
         for param in parameters:
             self.add_parameter(param)
@@ -475,8 +475,8 @@ class ParameterManager:
         add_cli_help_option: bool = True,
     ) -> None:
 
-        self._parameters: list[Parameter] = []
-        self._groups: list[OptionGroup] = []
+        self._parameters: typing.List[Parameter] = []
+        self._groups: typing.List[OptionGroup] = []
 
         self.defaults_override = defaults_override
 
