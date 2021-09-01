@@ -369,25 +369,26 @@ class ParamValueDict(collections.UserDict):
             raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
 
 
-class ParameterGroup:
+class OptionGroup:
     """Container for a set of related parameters. A parameter can belong to more
     than one group.
     """
 
-    def __init__(self, param_manager, name, help):
-        self._param_manager = param_manager
-        self._parameters: list[Parameter] = []
-
+    def __init__(self, name, help=None, parameters: list[Parameter] = []):
         self.name = name
         self.help = help
+        self._parameters: list[Parameter] = []
+
+        for param in parameters:
+            self.add_parameter(param)
 
     def add_parameter(self, param: Parameter):
-        
-        if param not in self._param_manager._parameters:
-            self._param_manager.add_parameter(param)
+        _check_for_clash_with_existing_params(param, self._parameters)
 
-        if param not in self._parameters:    
-            self._parameters.append(param)
+        self._parameters.append(param)
+
+    def get_parameters(self):
+        return [param for param in self._parameters if not param.cli_only]
 
     def add_param(
         self,
@@ -407,7 +408,6 @@ class ParameterGroup:
         behaviour: DefaultParameterBehaviour = None,
         
         cli_only: bool = False, 
-        cli_positional: bool = False, 
         cli_enabled: bool = True,
 
         **kwargs
@@ -429,7 +429,7 @@ class ParameterGroup:
             behaviour=behaviour,
             
             cli_only=cli_only,
-            cli_positional=cli_positional,
+            cli_positional=False,
             cli_enabled=cli_enabled,
 
             **kwargs
@@ -439,6 +439,27 @@ class ParameterGroup:
 
         return param
 
+def _check_for_clash_with_existing_params(param, existing_params):
+
+    for existing_param in existing_params:
+        if existing_param.name == param.name:
+            raise ValueError(f"Error when adding parameter '{param.name}': a parameter with the same name "
+                                "has already been added.")
+        
+        clashing_flags = set(existing_param.flags).intersection(param.flags)
+        if len(clashing_flags) > 0:
+            raise ValueError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
+                                f"also has flags '{clashing_flags}'.")
+
+def _unique_params(*parameter_lists):
+    unique_list = []
+
+    for param_list in parameter_lists:
+        for param in param_list:
+            if param not in unique_list:
+                unique_list.append(param)
+
+    return unique_list
 
 class ParameterManager:
     """The Parameter Manager essentialy consists of a set of parameters, and a
@@ -455,7 +476,7 @@ class ParameterManager:
     ) -> None:
 
         self._parameters: list[Parameter] = []
-        self._groups: list[ParameterGroup] = []
+        self._groups: list[OptionGroup] = []
 
         self.defaults_override = defaults_override
 
@@ -476,16 +497,7 @@ class ParameterManager:
 
 
     def add_parameter(self, param: Parameter):
-        
-        for existing_param in self._parameters:
-            if existing_param.name == param.name:
-                raise ValueError(f"Error when adding parameter '{param.name}': a parameter with the same name "
-                                  "has already been added.")
-            
-            clashing_flags = set(existing_param.flags).intersection(param.flags)
-            if len(clashing_flags) > 0:
-                raise ValueError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
-                                 f"also has flags '{clashing_flags}'.")
+        _check_for_clash_with_existing_params(param, self.get_all_parameters())
 
         self._parameters.append(param)
 
@@ -539,38 +551,42 @@ class ParameterManager:
 
         return param
 
-    def add_group(self, name, help):
+    def add_group(self, group):
+        # Copies the group and adds it. Subsequent changes to the group have no
+        # effect on the already added group
 
         for existing_group in self._groups:
-            if existing_group.name == name:
-                raise ValueError(f"Error when adding group '{name}': a group with that name has already been added.")
+            if existing_group.name == group.name:
+                raise ValueError(f"Error when adding group '{group.name}': a group with that "
+                                "name has already been added.")
 
-        group = ParameterGroup(name, help)
+        group_copy = OptionGroup(group.name, group.help, group._parameters)
 
-        self._groups.append(group)
+        for param in group.get_parameters():
+            _check_for_clash_with_existing_params(param, self.get_all_parameters())
 
-        return group
+        self._groups.append(group_copy)
 
     def get_groups(self):
         return list(self._groups)
 
-    def get_all_parameters_not_in_any_group(self):
-        return list(set(self._parameters).difference([group._param_manager for group in self._groups]))
+    def get_all_parameters_in_groups(self):
+        return _unique_params(*[group._parameters for group in self._groups])
 
     def get_all_parameters(self):
-        return list(self._parameters)
+        return _unique_params(self._parameters, *[group._parameters for group in self._groups])
 
     def get_parameters(self):
-        return [param for param in self._parameters if not param.cli_only]
+        return [param for param in self.get_all_parameters() if not param.cli_only]
 
     def get_cli_only_parameters(self):
-        return [param for param in self._parameters if param.cli_only]
+        return [param for param in self.get_all_parameters() if param.cli_only]
 
     def get_cli_optionals(self):
-        return [param for param in self._parameters if param.cli_enabled and not param.cli_positional]
+        return [param for param in self.get_all_parameters() if param.cli_enabled and not param.cli_positional]
 
     def get_cli_positionals(self):
-        return [param for param in self._parameters if param.cli_enabled and param.cli_positional]
+        return [param for param in self.get_all_parameters() if param.cli_enabled and param.cli_positional]
 
 
     def add_defaults(self, result_dict):

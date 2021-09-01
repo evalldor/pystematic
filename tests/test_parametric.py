@@ -303,3 +303,169 @@ def test_negative_integers():
 
     res = params.from_cli(["--pos-1", "-1"])
     assert res["pos_1"] == -1
+
+def test_option_group():
+    params = parametric.ParameterManager()
+    
+    params.add_param(
+        name="pos_1",
+        help="A positional arg",
+        cli_positional=True
+    )
+    params.add_param(
+        name="pos_2", 
+        nargs="*",
+        help="A positional arg 2",
+        cli_positional=True
+    )
+    params.add_param(
+        name="pos_3", 
+        nargs=3,
+        help=None,
+        cli_positional=True
+    )
+    params.add_param(
+        name="pos_4", 
+        nargs="+",
+        help="A positional arg 4",
+        cli_positional=True
+    )
+
+    group1 = parametric.OptionGroup("Group1")
+    group1.add_param(
+        name="string_param",
+        flags=["--string-param"],
+        help="A string parameter used for testing.",
+        default=lambda: "hello"
+    )
+
+    group1.add_param(
+        name="int_param",
+        flags=["--int-param"], 
+        help="An int parameter used for testing.",
+        type=int,
+        default=18,
+        required=True
+    )
+    params.add_group(group1)
+
+    group2 = parametric.OptionGroup("Group2")
+    group2.add_param(
+        name="float_param",
+        flags=["--float-param"], 
+        help="A float parameter used for testing.",
+        type=float
+    )
+
+    group2.add_param(
+        name="flag_param",
+        flags=["-f", "--flag-param"],
+        help="A flag parameter used for testing.",
+        nargs="?"
+    )
+    params.add_group(group2)
+    
+    params.add_param(
+        name="pure_flag",
+        flags=["-p", "--pure-flag"],
+        help="A flag parameter with no args.",
+        nargs=0
+    )
+
+    params.add_param(
+        name="multiple_str",
+        flags=["--multiple-str"],
+        help="A string parameter that can be added multiple times.",
+        nargs="*",
+        default=["hej"]
+    )
+
+
+    res = params.from_cli(["--multiple-str", "asd", "asdasd", "--", "woot", "odn", "fpo", "sdnf", "--flag-param"])
+    assert res["multiple_str"] == ["asd", "asdasd"]
+    assert res["pos_1"] == "woot"
+    assert res["pos_2"] == []
+    assert res["pos_3"] == ["odn", "fpo", "sdnf"]
+    assert res["pos_4"] == ["--flag-param"]
+
+    res = params.from_cli(["--multiple-str", "asd", "asdasd", "-p", "woot", "--", "odn", "fpo", "sdnf", "--flag-param"])
+    assert res["multiple_str"] == ["asd", "asdasd"]
+    assert res["pos_1"] == "woot"
+    assert res["pos_2"] == []
+    assert res["pos_3"] == ["odn", "fpo", "sdnf"]
+    assert res["pos_4"] == ["--flag-param"]
+
+    res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "-fp", "--float-param=3.14", "--int-param", "3", 
+                            "--multiple-str", "asd", "asdasd", "--flag-param", "1"])
+    
+    assert res["pos_1"] == "woot"
+    assert res["pos_2"] == []
+    assert res["pos_3"] == ["odn", "fpo", "sdnf"]
+    assert res["pos_4"] == ["asd"]
+    assert res["pure_flag"] is None
+    assert res["string_param"] == "hello"
+    assert res["int_param"] == 3
+    assert res["multiple_str"] == ["asd", "asdasd"]
+    assert res["flag_param"] == "1"
+
+def test_duplicate_option_group():
+    param = parametric.ParameterManager()
+    
+    param.add_param(
+        name="pos_1",
+        help="A positional arg",
+        cli_positional=True
+    )
+
+    group = parametric.OptionGroup("a_group")
+
+    group.add_param(
+        name="group_param1"
+    )
+
+    param.add_group(group)
+
+    with pytest.raises(Exception):
+        param.add_group(group) 
+
+def test_group_with_duplicate_params():
+    param = parametric.ParameterManager()
+    
+    param.add_param(
+        name="pos_1",
+        help="A positional arg",
+        cli_positional=True
+    )
+
+    group = parametric.OptionGroup("a_group")
+
+    group.add_param(
+        name="pos_1"
+    )
+
+    with pytest.raises(Exception):
+        group.add_param(
+            name="pos_1"
+        )
+
+    with pytest.raises(Exception):
+        param.add_group(group)
+
+    param = parametric.ParameterManager()
+
+    group = parametric.OptionGroup("a_group")
+
+    group.add_param(
+        name="pos_1"
+    )
+
+    group2 = parametric.OptionGroup("b_group")
+
+    group2.add_param(
+        name="pos_1"
+    )
+
+    param.add_group(group)
+
+    with pytest.raises(Exception):
+        param.add_group(group2)
