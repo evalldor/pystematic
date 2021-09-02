@@ -644,7 +644,53 @@ def group_decorator(name=None, inherit_params=None):
     return functools.partial(_group_constructor, name=name, inherit_params=inherit_params)
 
 
-def parameter_group_decorator(name, *parameters, help=None):
+def parameter_group_decorator(name, *parameters):
+    """Defines a parameter group. Useful when you have many parameters and want
+    to organize them. Parameter groups are not visible when passing parameters to, or
+    reading parameters in the experiment. Their sole purpose is to make the CLI
+    help output a bit more structured, which hopefully helps your colleagues
+    when inspecting the experiment.
+   
+    You define the parameters that you want to pass to this decorator with the
+    normal parameter decorator, but without using the '@' in front of the
+    function. Like this:
+
+    .. code-block:: python
+
+        import pystematic as ps
+
+        @ps.param_group(
+            "param_group",
+            ps.parameter(
+                name="str_param",
+                type=str
+            ),
+            ps.parameter(
+                name="int_param",
+                type=int
+            )
+        )
+        @ps.experiment
+        def exp(params):
+            print(f"str_param is {params["str_param"]} and int_param is {params["int_param"]}")
+
+    Args:
+        name (str): The name of the group
+
+        help (str, optional): An optional description of this group. If provided, 
+            it has to be passed as the second argument to this decorator. Defaults 
+            to None.
+
+        *parameters (Parameter): An arbirary number of parameters that should belong 
+            to this group. Use the parameter decorator - but without the '@' - 
+            to create parameters that you pass as positional arguments to this function.
+    """
+    help = None
+
+    if len(parameters) > 0:
+        if isinstance(parameters[0], str):
+            help = parameters[0]
+            parameters = parameters[1:]
 
     def decorator(experiment):
         group = ParameterGroup(name, help, parameters)

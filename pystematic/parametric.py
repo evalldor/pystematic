@@ -26,8 +26,6 @@ Usage:
 The main use of this lib is through (an instance of) the ParameterManager class.
 It allows you to define parameters as well as read them from various sources.
 """
-
-
 import collections
 import typing
 import typing_extensions
@@ -37,11 +35,14 @@ import itertools
 import os
 import dataclasses
 
+
 class BaseError(Exception):
     pass
 
+
 class ValidationError(Exception):
     pass
+
 
 OPTIONAL = "?"
 ZERO_OR_MORE = "*"
@@ -339,7 +340,7 @@ class Parameter:
         return str(self)
 
 
-class ParamValueDict(collections.UserDict):
+class _ParamValueDict(collections.UserDict):
     # todo: go back to scopes and __set_item__
     def __init__(self, params):
         super().__init__()
@@ -383,6 +384,10 @@ class OptionGroup:
             self.add_parameter(param)
 
     def add_parameter(self, param: Parameter):
+        if param.cli_positional:
+            raise ValueError(f"Error when adding parameter '{param.name}' to group '{self.name}': "
+                            "option groups cannot contain CLI positional parameters.")
+
         _check_for_clash_with_existing_params(param, self._parameters)
 
         self._parameters.append(param)
@@ -439,6 +444,7 @@ class OptionGroup:
 
         return param
 
+
 def _check_for_clash_with_existing_params(param, existing_params):
 
     for existing_param in existing_params:
@@ -451,6 +457,7 @@ def _check_for_clash_with_existing_params(param, existing_params):
             raise ValueError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
                                 f"also has flags '{clashing_flags}'.")
 
+
 def _unique_params(*parameter_lists):
     unique_list = []
 
@@ -460,6 +467,7 @@ def _unique_params(*parameter_lists):
                 unique_list.append(param)
 
     return unique_list
+
 
 class ParameterManager:
     """The Parameter Manager essentialy consists of a set of parameters, and a
@@ -633,7 +641,7 @@ class ParameterManager:
                 raise ValidationError(f"Parameter '{param.name}' is required.")
 
     def from_cli(self, argv=None, defaults=True, env=True):
-        result_dict = ParamValueDict(self.get_parameters())
+        result_dict = _ParamValueDict(self.get_parameters())
 
         if argv is None:
             argv = sys.argv[1:]
@@ -653,7 +661,7 @@ class ParameterManager:
         return dict(result_dict)
 
     def from_shared_cli(self, argv=None, defaults=True, env=True):
-        result_dict = ParamValueDict(self.get_parameters())
+        result_dict = _ParamValueDict(self.get_parameters())
 
         if argv is None:
             argv = sys.argv[1:]
@@ -673,7 +681,7 @@ class ParameterManager:
         return dict(result_dict), argv_rest
 
     def from_dict(self, values, defaults=True, env=True):
-        result_dict = ParamValueDict(self.get_parameters())
+        result_dict = _ParamValueDict(self.get_parameters())
 
         self.add_dict_values(values, result_dict)
 
@@ -824,7 +832,7 @@ class CliHelpFormatter:
         self.console.print(Padding(grid, (0, 1)))
 
 
-ParseResult = collections.namedtuple("ParseResult", ["arg", "flag", "value"])
+_ParseResult = collections.namedtuple("_ParseResult", ["arg", "flag", "value"])
 
 
 class ParseError(BaseError):
@@ -857,24 +865,24 @@ def parse_args(arg_list, positional_params, optional_params):
 
     parsed_optionals = []
 
-    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    max_num_positional_values = _calculate_maximum_allowed_number_of_positional_values(positional_params)
 
     # Parse optionals
-    parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+    parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
 
     # Parse one chunk of positional values
-    positional_values, end_options_token_encountered = consume_positional_values(arg_list, max_num_positional_values, False)
+    positional_values, end_options_token_encountered = _consume_positional_values(arg_list, max_num_positional_values, False)
 
     if not end_options_token_encountered:
         # Parse any remaining optionals
-        parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+        parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
     
     # Any remaining values are unrecognized 
     if len(arg_list) > 0:
-        parsing_error(arg_list, "Unrecognized value.")
+        _parsing_error(arg_list, "Unrecognized value.")
 
     if len(positional_params) > 0:
-        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+        parsed_positionals = _assign_values_to_positionals(positional_params, positional_values)
     else:
         parsed_positionals = []
 
@@ -892,23 +900,23 @@ def parse_known_args(arg_list, positional_params, optional_params):
 
     parsed_optionals = []
 
-    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    max_num_positional_values = _calculate_maximum_allowed_number_of_positional_values(positional_params)
 
     try:
         # Parse optionals
-        parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+        parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
 
         # Parse one chunk of positional values
-        positional_values, end_options_token_encountered = consume_positional_values(arg_list, max_num_positional_values, False)
+        positional_values, end_options_token_encountered = _consume_positional_values(arg_list, max_num_positional_values, False)
 
         if not end_options_token_encountered:
             # Parse any remaining optionals
-            parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+            parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
     except UnknownOptionsFlag:
         pass
 
     if len(positional_params) > 0:
-        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+        parsed_positionals = _assign_values_to_positionals(positional_params, positional_values)
     else:
         parsed_positionals = []
 
@@ -922,17 +930,17 @@ def parse_intermixed_args(arg_list, positional_params, optional_params):
 
     parsed_optionals = []
     positional_values = []
-    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    max_num_positional_values = _calculate_maximum_allowed_number_of_positional_values(positional_params)
     end_options_token_encountered = False
 
     while len(arg_list) > 0:
         if not end_options_token_encountered:
-            parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+            parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
 
         if len(positional_values) >= max_num_positional_values:
             break
 
-        values, end_options_token_encountered = consume_positional_values(
+        values, end_options_token_encountered = _consume_positional_values(
             arg_list, 
             max_num_values_to_consume=max_num_positional_values - len(positional_values), 
             end_options_token_encountered=end_options_token_encountered
@@ -942,10 +950,10 @@ def parse_intermixed_args(arg_list, positional_params, optional_params):
 
     # Any remaining values are unrecognized 
     if len(arg_list) > 0:
-        parsing_error(arg_list, "Unrecognized value.")
+        _parsing_error(arg_list, "Unrecognized value.")
 
     if len(positional_params) > 0:
-        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+        parsed_positionals = _assign_values_to_positionals(positional_params, positional_values)
     else:
         parsed_positionals = []
 
@@ -959,18 +967,18 @@ def parse_known_intermixed_args(arg_list, positional_params, optional_params):
 
     parsed_optionals = []
     positional_values = []
-    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    max_num_positional_values = _calculate_maximum_allowed_number_of_positional_values(positional_params)
     end_options_token_encountered = False
 
     try:
         while len(arg_list) > 0:
             if not end_options_token_encountered:
-                parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+                parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
             
             if len(positional_values) >= max_num_positional_values:
                 break
 
-            values, end_options_token_encountered = consume_positional_values(
+            values, end_options_token_encountered = _consume_positional_values(
                 arg_list, 
                 max_num_values_to_consume=max_num_positional_values - len(positional_values), 
                 end_options_token_encountered=end_options_token_encountered
@@ -980,7 +988,7 @@ def parse_known_intermixed_args(arg_list, positional_params, optional_params):
         pass
 
     if len(positional_params) > 0:
-        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+        parsed_positionals = _assign_values_to_positionals(positional_params, positional_values)
     else:
         parsed_positionals = []
 
@@ -996,38 +1004,38 @@ def parse_shared_args(arg_list, positional_params, optional_params):
 
     parsed_optionals = []
 
-    max_num_positional_values = calculate_maximum_allowed_number_of_positional_values(positional_params)
+    max_num_positional_values = _calculate_maximum_allowed_number_of_positional_values(positional_params)
 
     # Parse optionals
-    parsed_optionals.extend(consume_optionals(optional_params, arg_list))
+    parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
 
     # Parse one chunk of positional values
-    positional_values, end_options_token_encountered = consume_positional_values(arg_list, max_num_positional_values, False)
+    positional_values, end_options_token_encountered = _consume_positional_values(arg_list, max_num_positional_values, False)
 
     if len(positional_params) > 0:
-        parsed_positionals = assign_values_to_positionals(positional_params, positional_values)
+        parsed_positionals = _assign_values_to_positionals(positional_params, positional_values)
     else:
         parsed_positionals = []
 
     return parsed_positionals + parsed_optionals, arg_list
 
 
-def consume_optionals(optional_params, arg_list):
+def _consume_optionals(optional_params, arg_list):
     parsed_optionals = []
 
-    while len(arg_list) > 0 and is_flag(arg_list[0]):
-        parsed_optionals.extend(parse_optional(optional_params, arg_list))
+    while len(arg_list) > 0 and _is_flag(arg_list[0]):
+        parsed_optionals.extend(_parse_optional(optional_params, arg_list))
 
     return parsed_optionals
 
 
-def consume_positional_values(arg_list, max_num_values_to_consume, end_options_token_encountered):
+def _consume_positional_values(arg_list, max_num_values_to_consume, end_options_token_encountered):
     positional_values = []
     
     while (
         len(arg_list) > 0 and 
         len(positional_values) < max_num_values_to_consume and 
-        (not is_flag(arg_list[0]) or end_options_token_encountered)
+        (not _is_flag(arg_list[0]) or end_options_token_encountered)
     ):
         if not end_options_token_encountered and arg_list[0] == "--":
             end_options_token_encountered = True
@@ -1038,12 +1046,12 @@ def consume_positional_values(arg_list, max_num_values_to_consume, end_options_t
     return positional_values, end_options_token_encountered
 
 
-def parsing_error(arg_list, msg):
+def _parsing_error(arg_list, msg):
     # TODO: use arg list in error reporting
     raise ParseError(msg)
 
 
-def calculate_maximum_allowed_number_of_positional_values(positional_params):
+def _calculate_maximum_allowed_number_of_positional_values(positional_params):
     max_num_values = 0
 
     for param in positional_params:
@@ -1059,15 +1067,15 @@ def calculate_maximum_allowed_number_of_positional_values(positional_params):
     return max_num_values
 
 
-def is_flag(token):
+def _is_flag(token):
     return token != "--" and re.match(r"^-\D", token)
 
 
-def is_value(token):
-    return token != "--" and not is_flag(token)
+def _is_value(token):
+    return token != "--" and not _is_flag(token)
 
 
-def parse_optional(optional_params, arg_list):
+def _parse_optional(optional_params, arg_list):
 
     def get_param_for_flag(flag):
         for param in optional_params:
@@ -1093,9 +1101,9 @@ def parse_optional(optional_params, arg_list):
         param = get_param_for_flag(flag)
         arg_list.pop(0)
 
-        values += consume_optional_values(arg_list, param.nargs, num_already_consumed_values=len(values))
+        values += _consume_optional_values(arg_list, param.nargs, num_already_consumed_values=len(values))
 
-        parsed_options.append(ParseResult(param, flag, values))
+        parsed_options.append(_ParseResult(param, flag, values))
 
     elif re.match(r"^-[^-]", flag): # Handle short flags
         # Shorthand flags may be joined together 
@@ -1105,54 +1113,55 @@ def parse_optional(optional_params, arg_list):
             param = get_param_for_flag(flag)
             arg_list.pop(0)
 
-            values += consume_optional_values(arg_list, param.nargs, num_already_consumed_values=len(values))
+            values += _consume_optional_values(arg_list, param.nargs, num_already_consumed_values=len(values))
 
-            parsed_options.append(ParseResult(param, flag, values))
+            parsed_options.append(_ParseResult(param, flag, values))
 
         else: # We have muliple shorthand flags
             # None of the combined flags may consume any values. 
             # TODO: Maybe change in future...
 
             if len(values) > 0:
-                parsing_error(arg_list, "Unexpected value encountered. Combined shorthand "
+                _parsing_error(arg_list, "Unexpected value encountered. Combined shorthand "
                                         "options can not be assigned values.")
 
             all_flags = [f"-{char}" for char in flag[1:]]
 
             for flag in all_flags:
                 arg = get_param_for_flag(flag)
-                parsed_options.append(ParseResult(arg, flag, []))
+                parsed_options.append(_ParseResult(arg, flag, []))
 
             arg_list.pop(0)
 
     else:
-        parsing_error(arg_list, "Invalid flag encountered. This should never happen.")
+        _parsing_error(arg_list, "Invalid flag encountered. This should never happen.")
 
     return parsed_options
 
 
-def consume_optional_values(arg_list, nargs, num_already_consumed_values=0):
+def _consume_optional_values(arg_list, nargs, num_already_consumed_values=0):
     # This function consumes a number of values from the arg list determined by
     # 'nargs'. It always looks ahead to make sure that no optional flags are consumed.
     
     consumed_values = []
 
     if nargs == OPTIONAL:
-        if len(arg_list) > 0 and is_value(arg_list[0]) and num_already_consumed_values == 0:
+        if len(arg_list) > 0 and _is_value(arg_list[0]) and num_already_consumed_values == 0:
             consumed_values.append(arg_list.pop(0))
     elif nargs in [ZERO_OR_MORE, ONE_OR_MORE]:
-        while len(arg_list) > 0 and is_value(arg_list[0]):
+        while len(arg_list) > 0 and _is_value(arg_list[0]):
             consumed_values.append(arg_list.pop(0))
     else:
         if nargs is None:
             nargs = 1
-        while len(arg_list) > 0 and is_value(arg_list[0]) and len(consumed_values) + num_already_consumed_values < nargs:
+        
+        while len(arg_list) > 0 and _is_value(arg_list[0]) and len(consumed_values) + num_already_consumed_values < nargs:
             consumed_values.append(arg_list.pop(0))
         
     return consumed_values
 
 
-def assign_values_to_positionals(positional_params, positional_values):
+def _assign_values_to_positionals(positional_params, positional_values):
     parsed_positionals = []
 
     num_assigned_values_per_param = collections.defaultdict(lambda: 0)
@@ -1203,13 +1212,13 @@ def assign_values_to_positionals(positional_params, positional_values):
             # filled in the previous step
             curr_param_index += 1
     
-    assert get_num_assigned_values() == len(positional_values), "Internal error, too many positional values passed to 'assign_values_to_positionals'."
+    assert get_num_assigned_values() == len(positional_values), "Internal error, too many positional values passed to '_assign_values_to_positionals'."
 
     value_indices = list(itertools.accumulate(num_assigned_values_per_param.values()))
     value_indices.insert(0, 0)
 
     for i, param in enumerate(positional_params):
-        parsed_positionals.append(ParseResult(
+        parsed_positionals.append(_ParseResult(
             param, 
             None, 
             positional_values[value_indices[min(i, len(value_indices)-1)]:value_indices[min(i+1, len(value_indices)-1)]]

@@ -6,9 +6,12 @@ Decorators
 
 .. autodecorator:: pystematic.experiment
 
+.. autodecorator:: pystematic.group
+
 .. autodecorator:: pystematic.parameter
 
-.. autofunction:: pystematic.group
+.. autodecorator:: pystematic.param_group(name, help=None, *parameters)
+
 
 Core types
 ----------
@@ -26,6 +29,11 @@ their corresponding decorators.
 
 .. autoclass:: pystematic.core.Parameter
   :members: 
+  :undoc-members:
+
+.. autoclass:: pystematic.core.ParameterGroup
+  :members: 
+  :undoc-members:
 
 .. autoclass:: pystematic.core.PystematicApp
   :members: get_api_object, on_experiment_created, on_before_experiment, on_after_experiment
