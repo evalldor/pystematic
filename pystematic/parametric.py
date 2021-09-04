@@ -33,16 +33,18 @@ import sys
 import re
 import itertools
 import os
-import dataclasses
 
 
 class BaseError(Exception):
     pass
 
 
-class ValidationError(Exception):
+class ValidationError(BaseError):
     pass
 
+
+class ParamInitError(BaseError):
+    pass
 
 OPTIONAL = "?"
 ZERO_OR_MORE = "*"
@@ -138,7 +140,7 @@ class BooleanFlagBehaviour(DefaultParameterBehaviour):
         flags = [flag for flag in param.flags if flag.startswith("--")]
 
         if len(flags) == 0:
-            raise ValueError(f"Error during initialization: expected at least one long flag, got '{param.flags}'.")
+            raise BaseError(f"Error during initialization: expected at least one long flag, got '{param.flags}'.")
 
         negative_flags = []
         for flag in flags:
@@ -184,10 +186,10 @@ class Parameter:
         # Validate name
         #
         if not isinstance(name, str):
-            raise ValueError("Invalid name '{name}': expected a string.")
+            raise ParamInitError("Invalid name '{name}': expected a string.")
 
         if not name.isidentifier():
-            raise ValueError("Invalid name '{name}': must be a valid python identifier.")
+            raise ParamInitError("Invalid name '{name}': must be a valid python identifier.")
         
         #
         # Validate flags
@@ -199,23 +201,23 @@ class Parameter:
                 flags = [f"--{name.lower().replace('_', '-')}"]
 
         else:
-            raise ValueError(f"Unrecognized type for 'flags' ({flags}) should be list, str or None.")
+            raise ParamInitError(f"Unrecognized type for 'flags' ({flags}) should be list, str or None.")
 
         for flag in flags:
             if not isinstance(flag, str):
-                raise ValueError(f"Invalid flag '{flag}': expected a string.")
+                raise ParamInitError(f"Invalid flag '{flag}': expected a string.")
 
             if len(flag) == 0:
-                raise ValueError(f"Got an empty flag for param {name}.")
+                raise ParamInitError(f"Got an empty flag for param {name}.")
 
             if flag[0] != "-":
-                raise ValueError(f"Invalid flag '{flag}': must start with the prefix '-'.")
+                raise ParamInitError(f"Invalid flag '{flag}': must start with the prefix '-'.")
             
             if re.match(r"^-[^-]{2,}", flag): 
-                raise ValueError(f"Invalid flag '{flag}': short flags can only be a single character.")
+                raise ParamInitError(f"Invalid flag '{flag}': short flags can only be a single character.")
 
             if re.match(r"^-\d", flag):
-                raise ValueError(f"Invalid flag '{flag}': short flags cannot be numeric "
+                raise ParamInitError(f"Invalid flag '{flag}': short flags cannot be numeric "
                                   "(it would result in ambiguity with negative numbers).")
 
         #
@@ -228,7 +230,7 @@ class Parameter:
             type = BooleanType()
 
         if not callable(type):
-            raise ValueError("Invalid type '{type}': must be a callable.")
+            raise ParamInitError("Invalid type '{type}': must be a callable.")
 
         
 
@@ -236,18 +238,18 @@ class Parameter:
         # Validate nargs
         #
         if nargs not in (None, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE) and (not isinstance(nargs, int) or nargs < 0):
-            raise ValueError(f"Invalid nargs value '{nargs}': must be a non negative integer or one of "
+            raise ParamInitError(f"Invalid nargs value '{nargs}': must be a non negative integer or one of "
                              f"'{(None, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE)}'.")
 
         if envvar is not None:
             if not isinstance(envvar, str):
-                raise ValueError(f"Invalid envvar type: expected a string.")
+                raise ParamInitError(f"Invalid envvar type: expected a string.")
 
         if behaviour is None:
             behaviour = DefaultParameterBehaviour()
 
         if cli_only and not cli_enabled:
-            raise ValueError("'cli_only' and 'cli_enabled' may not be contradictive.")
+            raise ParamInitError("'cli_only' and 'cli_enabled' may not be contradictive.")
 
         self.name = name
         self.flags = flags
@@ -320,18 +322,18 @@ class Parameter:
     def _validate_nargs(self, value):
         if self.nargs in (None, OPTIONAL, 0):
             if isinstance(value, (list, tuple)):
-                raise ValueError(f"Expected a single value, got a collection of length {len(value)}.")
+                raise ValidationError(f"Expected a single value, got a collection of length {len(value)}.")
         elif value is not None:
             if not isinstance(value, (list, tuple)):
-                raise ValueError(f"Expected a list of values, got '{value}'.")
+                raise ValidationError(f"Expected a list of values, got '{value}'.")
             
             if self.nargs == ONE_OR_MORE:
                 if len(value) == 0:
-                    raise ValueError(f"Expected at least one value.")
+                    raise ValidationError(f"Expected at least one value.")
             
             elif self.nargs != ZERO_OR_MORE:
                 if len(value) != self.nargs:
-                    raise ValueError(f"Expected a list of exactly {self.nargs} values, got {len(value)}.")
+                    raise ValidationError(f"Expected a list of exactly {self.nargs} values, got {len(value)}.")
 
     def __str__(self) -> str:
         return f"Parameter(name={self.name}, flags={self.flags})"
@@ -361,13 +363,13 @@ class _ParamValueDict(collections.UserDict):
         try:
             param.set_value(value, self)
         except Exception as e:
-            raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
+            raise BaseError(f"Error when setting value for param '{param.name}': {e}") from e
 
     def set_cli_value(self, param, flag, value):
         try:
             param.set_cli_value(flag, value, self)
         except Exception as e:
-            raise ValueError(f"Error when setting value for param '{param.name}': {e}") from None
+            raise BaseError(f"Error when setting value for param '{param.name}': {e}") from e
 
 
 class OptionGroup:
@@ -385,7 +387,7 @@ class OptionGroup:
 
     def add_parameter(self, param: Parameter):
         if param.cli_positional:
-            raise ValueError(f"Error when adding parameter '{param.name}' to group '{self.name}': "
+            raise BaseError(f"Error when adding parameter '{param.name}' to group '{self.name}': "
                             "option groups cannot contain CLI positional parameters.")
 
         _check_for_clash_with_existing_params(param, self._parameters)
@@ -449,12 +451,12 @@ def _check_for_clash_with_existing_params(param, existing_params):
 
     for existing_param in existing_params:
         if existing_param.name == param.name:
-            raise ValueError(f"Error when adding parameter '{param.name}': a parameter with the same name "
+            raise BaseError(f"Error when adding parameter '{param.name}': a parameter with the same name "
                                 "has already been added.")
         
         clashing_flags = set(existing_param.flags).intersection(param.flags)
         if len(clashing_flags) > 0:
-            raise ValueError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
+            raise BaseError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
                                 f"also has flags '{clashing_flags}'.")
 
 
@@ -565,7 +567,7 @@ class ParameterManager:
 
         for existing_group in self._groups:
             if existing_group.name == group.name:
-                raise ValueError(f"Error when adding group '{group.name}': a group with that "
+                raise BaseError(f"Error when adding group '{group.name}': a group with that "
                                 "name has already been added.")
 
         group_copy = OptionGroup(group.name, group.help, group._parameters)

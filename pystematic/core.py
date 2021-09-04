@@ -168,10 +168,10 @@ class Parameter(parametric.Parameter):
         
         if is_flag:
             if allowed_values is not None:
-                raise ValueError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
+                raise BaseError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
             
             if multiple:
-                raise ValueError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
+                raise BaseError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
             
             behaviours.append(parametric.BooleanFlagBehaviour())
         else:
@@ -234,9 +234,16 @@ class Experiment:
         return self.param_manager.get_parameters()
 
     def add_param_group(self, param_group):
+        """Adds a parameter group to the experiment. 
+
+        Args:
+            param_group (ParameterGroup): The parameter group to add.
+        """
         self.param_manager.add_group(param_group)  
 
     def get_param_groups(self):
+        """Returns a list of all parameter groups for this experiment.
+        """
         return self.param_manager.get_groups()
 
     def __call__(self, params):
@@ -293,7 +300,7 @@ class Experiment:
         module = self.main_function.__module__
         name = self.main_function.__name__
         proc = multiprocessing.get_context('spawn').Process(
-            target=_run_experiment_by_name,
+            target=_entry_point_run_in_new_process,
             args=(module, name, params)
         )
         proc.start()
@@ -308,7 +315,7 @@ class Experiment:
             app.after_experiment()
 
 
-def _run_experiment_by_name(experiment_module, experiment_name, params):
+def _entry_point_run_in_new_process(experiment_module, experiment_name, params):
     # used by Experiment.run_in_new_process
     module = importlib.import_module(experiment_module)
     getattr(module, experiment_name).run(params)
@@ -357,6 +364,8 @@ class ExperimentGroup:
         self._inheritence_param_manager.add_group(param_group)  
 
     def get_param_groups(self):
+        """Returns a list of all parameter groups for this group.
+        """
         return self._inheritence_param_manager.get_groups()
 
     def experiment(self, name=None, inherit_params=None, defaults={}, inherit_params_from_group=True):
@@ -460,7 +469,7 @@ class ExperimentGroup:
             exp_name = param_values["experiment"]
             
             if exp_name not in experiments:
-                raise ValueError(f"Invalid experiment name '{exp_name}'.")
+                raise BaseError(f"Invalid experiment name '{exp_name}'.")
         except Exception as e:
             if exit_on_error:
                 self.param_manager.print_error(e)
@@ -554,34 +563,37 @@ def parameter_decorator(
     """
     
     def decorator(experiment):
+        try:
+            param = Parameter(
+                name=name,
+                type=type,
+                
+                default=default,
+                required=required,
+                allowed_values=allowed_values,
+                is_flag=is_flag,
+                multiple=multiple,
+                allow_from_file=allow_from_file,
+                envvar=envvar,
 
-        param = Parameter(
-            name=name,
-            type=type,
-            
-            default=default,
-            required=required,
-            allowed_values=allowed_values,
-            is_flag=is_flag,
-            multiple=multiple,
-            allow_from_file=allow_from_file,
-            envvar=envvar,
+                help=help,
+                default_help=default_help,
+                hidden=hidden,
+                behaviour=behaviour,
+            )
 
-            help=help,
-            default_help=default_help,
-            hidden=hidden,
-            behaviour=behaviour,
-        )
+            if isinstance(experiment, (Experiment, ExperimentGroup)):
+                experiment.add_parameter(param)
+            else:
+                if not hasattr(experiment, "__params_memo__"):
+                    experiment.__params_memo__ = []
+                
+                experiment.__params_memo__.append(param)
 
-        if isinstance(experiment, (Experiment, ExperimentGroup)):
-            experiment.add_parameter(param)
-        else:
-            if not hasattr(experiment, "__params_memo__"):
-                experiment.__params_memo__ = []
-            
-            experiment.__params_memo__.append(param)
+            return experiment
 
-        return experiment
+        except parametric.BaseError or BaseError as e:
+            raise BaseError(e) from None
 
     return decorator
 
@@ -693,17 +705,20 @@ def parameter_group_decorator(name, *parameters):
             parameters = parameters[1:]
 
     def decorator(experiment):
-        group = ParameterGroup(name, help, parameters)
+        try:
+            group = ParameterGroup(name, help, parameters)
 
-        if isinstance(experiment, (Experiment, ExperimentGroup)):
-            experiment.add_param_group(group)
-        else:
-            if not hasattr(experiment, "__params_memo__"):
-                experiment.__params_memo__ = []
-            
-            experiment.__params_memo__.append(group)
+            if isinstance(experiment, (Experiment, ExperimentGroup)):
+                experiment.add_param_group(group)
+            else:
+                if not hasattr(experiment, "__params_memo__"):
+                    experiment.__params_memo__ = []
+                
+                experiment.__params_memo__.append(group)
 
-        return experiment
+            return experiment
+        except parametric.BaseError or BaseError as e:
+            raise BaseError(e) from None
 
 
     return decorator
@@ -711,45 +726,53 @@ def parameter_group_decorator(name, *parameters):
 
 def _experiment_constructor(main_function, name=None, inherit_params=None, defaults={}, group=None, inherit_params_from_group=True):
 
-    experiment = Experiment(
-        main_function=main_function, 
-        name=name, 
-        defaults_override=defaults
-    )
+    try:
+        experiment = Experiment(
+            main_function=main_function, 
+            name=name, 
+            defaults_override=defaults
+        )
 
-    experiment = app.experiment_created(experiment)
+        experiment = app.experiment_created(experiment)
 
-    if group is not None:
+        if group is not None:
 
-        group.add_experiment(experiment)
+            group.add_experiment(experiment)
 
-        if inherit_params_from_group:
-            _inherit_params(experiment, group)
+            if inherit_params_from_group:
+                _inherit_params(experiment, group)
 
-    if inherit_params is not None:
-        _inherit_params(experiment, inherit_params)
+        if inherit_params is not None:
+            _inherit_params(experiment, inherit_params)
 
-    _read_params_memo(main_function, experiment)
+        _read_params_memo(main_function, experiment)
 
-    return experiment
+        return experiment
+
+    except parametric.BaseError or BaseError as e:
+        raise BaseError(e) from None
 
 
 def _group_constructor(main_function, name=None, inherit_params=None, group=None, inherit_params_from_group=True):
-    new_group = ExperimentGroup(main_function, name=name)
+    try:
+        new_group = ExperimentGroup(main_function, name=name)
 
-    if group is not None: # nested groups
+        if group is not None: # nested groups
 
-        group.add_experiment(new_group)
+            group.add_experiment(new_group)
 
-        if inherit_params_from_group:
-            _inherit_params(new_group, group)
+            if inherit_params_from_group:
+                _inherit_params(new_group, group)
 
-    if inherit_params is not None:
-        _inherit_params(new_group, inherit_params)
+        if inherit_params is not None:
+            _inherit_params(new_group, inherit_params)
 
-    _read_params_memo(main_function, new_group)
+        _read_params_memo(main_function, new_group)
 
-    return new_group
+        return new_group
+
+    except parametric.BaseError or BaseError as e:
+        raise BaseError(e) from None
 
 
 def _read_params_memo(function, experiment_or_group):
@@ -761,7 +784,7 @@ def _read_params_memo(function, experiment_or_group):
             elif isinstance(param, ParameterGroup):
                 experiment_or_group.add_param_group(param)
             else:
-                raise ValueError(f"Unrecognized value '{param}' found in parameter "
+                raise BaseError(f"Unrecognized value '{param}' found in parameter "
                                 f"list of main function '{function.__name__}'.")
     
 
@@ -797,11 +820,11 @@ def _inherit_params(experiment, inherit_from):
                         if param.name not in existing_param_groups:
                             experiment.add_param_group(param)
                     else:
-                        raise ValueError(f"Unrecognized value '{param}' found in parameter "
+                        raise BaseError(f"Unrecognized value '{param}' found in parameter "
                                         f"list of function '{exp.__name__}'.")
                     
             else:
-                raise ValueError(f"Unknown value passed to 'inherit_params': {exp}")
+                raise BaseError(f"Unknown value passed to 'inherit_params': {exp}")
     except Exception as e:
         if isinstance(experiment, (Experiment, ExperimentGroup)):
             name = experiment.name

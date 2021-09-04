@@ -20,11 +20,11 @@ These classes are not supposed to be instantiated manually, but only through
 their corresponding decorators.
 
 .. autoclass:: pystematic.core.Experiment
-  :members: add_parameter, get_parameters, run, cli, run_in_new_process
+  :members: get_param_groups, get_parameters, run, cli, run_in_new_process
   :undoc-members:
 
 .. autoclass:: pystematic.core.ExperimentGroup
-  :members: experiment, group, cli, add_parameter, get_parameters
+  :members: experiment, group, cli, get_parameters, get_param_groups
   :undoc-members:
 
 .. autoclass:: pystematic.core.Parameter

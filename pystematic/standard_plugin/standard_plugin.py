@@ -135,7 +135,7 @@ class StandardApi:
         procs = multiprocessing.active_children()
         for proc in procs:
             try:
-                proc.terminate()
+                proc.kill()
             except Exception:
                 pass
 

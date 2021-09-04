@@ -167,19 +167,19 @@ def test_parametric():
     assert res["multiple_str"] == ["asd", "asdasd"]
     assert res["flag_param"] == "1"
 
-    with pytest.raises(Exception):
+    with pytest.raises(parametric.BaseError):
         res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "-l"])
 
-    with pytest.raises(Exception):
+    with pytest.raises(parametric.BaseError):
         res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "-fpl"])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(parametric.BaseError):
         res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "--float-param", "asd"])
 
-    with pytest.raises(Exception):
+    with pytest.raises(parametric.BaseError):
         res = params.from_cli(["woot", "odn"])
 
-    with pytest.raises(Exception):
+    with pytest.raises(parametric.BaseError):
         res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "-fp", "asd"])
 
     # print()
@@ -209,21 +209,21 @@ def test_flag_param():
     assert res["flag_param"] == True
 
 def test_flags():
-    with pytest.raises(ValueError):
+    with pytest.raises(parametric.BaseError):
         params = parametric.ParameterManager()
         params.add_param(
             name="string_param",
             flags=["-1"],
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(parametric.BaseError):
         params = parametric.ParameterManager()
         params.add_param(
             name="string_param",
             flags=["-as"],
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(parametric.BaseError):
         params = parametric.ParameterManager()
         params.add_param(
             name="string_param"
@@ -233,7 +233,7 @@ def test_flags():
             name="string_param"
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(parametric.BaseError):
         params = parametric.ParameterManager()
         params.add_param(
             name="string_param",
@@ -245,7 +245,7 @@ def test_flags():
             flags="-a"
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(parametric.BaseError):
         params = parametric.ParameterManager()
         params.add_param(
             name="string_param",
@@ -297,9 +297,9 @@ def test_parse_shared():
 def test_negative_integers():
     params = parametric.ParameterManager()
     params.add_param(
-            name="pos_1",
-            type=float
-        )
+        name="pos_1",
+        type=float
+    )
 
     res = params.from_cli(["--pos-1", "-1"])
     assert res["pos_1"] == -1
