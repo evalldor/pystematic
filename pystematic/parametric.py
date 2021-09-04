@@ -493,7 +493,7 @@ class ParameterManager:
         self.env_prefix = env_prefix
         self.env_value_separators = env_value_separators
 
-        self.cli_help_formatter = cli_help_formatter or CliHelpFormatter()
+        self.cli_help_formatter = cli_help_formatter or HelpFormatter()
 
         if add_cli_help_option:
             self.add_param(
@@ -715,7 +715,7 @@ from rich.console import Console
 from rich.theme import Theme
 
 
-class CliHelpFormatter:
+class HelpFormatter:
 
     def __init__(self, no_style=False) -> None:
 
@@ -875,7 +875,10 @@ class _ArgList:
 
 
 class ParseError(Error):
-    pass
+    
+    def __init__(self, message, arg_list) -> None:
+        super().__init__(message)
+        self.arg_list = arg_list
 
 
 class UnknownOptionsFlag(ParseError):
@@ -1089,7 +1092,7 @@ def _consume_positional_values(arg_list, max_num_values_to_consume, end_options_
 
 def _parsing_error(arg_list, msg):
     # TODO: use arg list in error reporting
-    raise ParseError(msg)
+    raise ParseError(msg, arg_list)
 
 
 def _calculate_maximum_allowed_number_of_positional_values(positional_params):
@@ -1123,7 +1126,7 @@ def _parse_optional(optional_params, arg_list):
             if param.flags is not None and flag in param.flags:
                 return param
         
-        raise UnknownOptionsFlag(f"Unrecognized option '{flag}'.")
+        raise UnknownOptionsFlag(f"Unrecognized option '{flag}'.", arg_list)
 
     # Postpone popping the flag until we are sure we can consume it
 

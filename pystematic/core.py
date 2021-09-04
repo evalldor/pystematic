@@ -8,8 +8,8 @@ import importlib_metadata
 import logging
 
 from . import parametric
-from . import cli_help_formatters
-import pystematic
+from . import help_formatters
+
 
 logger = logging.getLogger("pystematic.core")
 
@@ -218,7 +218,7 @@ class Experiment:
         self.param_manager = parametric.ParameterManager(
             defaults_override=defaults_override,
             add_cli_help_option=True,
-            cli_help_formatter=cli_help_formatters.ExperimentHelpFormatter()
+            cli_help_formatter=help_formatters.ExperimentHelpFormatter()
         )
 
     def add_parameter(self, param):
@@ -335,7 +335,7 @@ class ExperimentGroup:
 
         self.param_manager = parametric.ParameterManager(
             add_cli_help_option=True,
-            cli_help_formatter=cli_help_formatters.GroupHelpFormatter(self)
+            cli_help_formatter=help_formatters.GroupHelpFormatter(self)
         )
         
         self.param_manager.add_param(

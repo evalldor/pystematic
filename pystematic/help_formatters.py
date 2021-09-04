@@ -8,7 +8,7 @@ from rich.theme import Theme
 from . import parametric
 from . import core
 
-class GroupHelpFormatter(parametric.CliHelpFormatter):
+class GroupHelpFormatter(parametric.HelpFormatter):
 
     def __init__(self, group) -> None:
         super().__init__()
@@ -49,7 +49,7 @@ class GroupHelpFormatter(parametric.CliHelpFormatter):
                 self._print_experiments_recursive(grid, exp.experiments, padding+1)
 
 
-class ExperimentHelpFormatter(parametric.CliHelpFormatter):
+class ExperimentHelpFormatter(parametric.HelpFormatter):
 
     def print_error(self, error:Exception):
         self.console.print(f"[error]Error:[/error] {error} Use [flag]-h[/flag] for help.")
