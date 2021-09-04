@@ -229,7 +229,7 @@ class StandardApi:
         """Returns the local rank of the current process. The master process
         will always have rank 0, and every subprocess launched with
         :func:`pystematic.launch_subprocess` will be assigned a new local rank
-        by incrementing an integer counter starting at 1.
+        from an incrementing integer counter starting at 1.
 
         Returns:
             int: The local rank of the current process.
