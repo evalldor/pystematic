@@ -35,15 +35,15 @@ import itertools
 import os
 
 
-class BaseError(Exception):
+class Error(Exception):
     pass
 
 
-class ValidationError(BaseError):
+class ValidationError(Error):
     pass
 
 
-class ParamInitError(BaseError):
+class ParamInitError(Error):
     pass
 
 OPTIONAL = "?"
@@ -140,7 +140,7 @@ class BooleanFlagBehaviour(DefaultParameterBehaviour):
         flags = [flag for flag in param.flags if flag.startswith("--")]
 
         if len(flags) == 0:
-            raise BaseError(f"Error during initialization: expected at least one long flag, got '{param.flags}'.")
+            raise Error(f"Error during initialization: expected at least one long flag, got '{param.flags}'.")
 
         negative_flags = []
         for flag in flags:
@@ -363,13 +363,13 @@ class _ParamValueDict(collections.UserDict):
         try:
             param.set_value(value, self)
         except Exception as e:
-            raise BaseError(f"Error when setting value for param '{param.name}': {e}") from e
+            raise Error(f"Error when setting value for param '{param.name}': {e}") from e
 
     def set_cli_value(self, param, flag, value):
         try:
             param.set_cli_value(flag, value, self)
         except Exception as e:
-            raise BaseError(f"Error when setting value for param '{param.name}': {e}") from e
+            raise Error(f"Error when setting value for param '{param.name}': {e}") from e
 
 
 class OptionGroup:
@@ -387,7 +387,7 @@ class OptionGroup:
 
     def add_parameter(self, param: Parameter):
         if param.cli_positional:
-            raise BaseError(f"Error when adding parameter '{param.name}' to group '{self.name}': "
+            raise Error(f"Error when adding parameter '{param.name}' to group '{self.name}': "
                             "option groups cannot contain CLI positional parameters.")
 
         _check_for_clash_with_existing_params(param, self._parameters)
@@ -451,12 +451,12 @@ def _check_for_clash_with_existing_params(param, existing_params):
 
     for existing_param in existing_params:
         if existing_param.name == param.name:
-            raise BaseError(f"Error when adding parameter '{param.name}': a parameter with the same name "
+            raise Error(f"Error when adding parameter '{param.name}': a parameter with the same name "
                                 "has already been added.")
         
         clashing_flags = set(existing_param.flags).intersection(param.flags)
         if len(clashing_flags) > 0:
-            raise BaseError(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
+            raise Error(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
                                 f"also has flags '{clashing_flags}'.")
 
 
@@ -567,7 +567,7 @@ class ParameterManager:
 
         for existing_group in self._groups:
             if existing_group.name == group.name:
-                raise BaseError(f"Error when adding group '{group.name}': a group with that "
+                raise Error(f"Error when adding group '{group.name}': a group with that "
                                 "name has already been added.")
 
         group_copy = OptionGroup(group.name, group.help, group._parameters)
@@ -874,7 +874,7 @@ class _ArgList:
         return item
 
 
-class ParseError(BaseError):
+class ParseError(Error):
     pass
 
 

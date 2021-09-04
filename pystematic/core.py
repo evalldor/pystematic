@@ -14,11 +14,11 @@ import pystematic
 logger = logging.getLogger("pystematic.core")
 
 
-class BaseError(Exception):
+class Error(Exception):
     pass
 
 
-class ExperimentError(BaseError):
+class ExperimentError(Error):
     pass
 
 
@@ -168,10 +168,10 @@ class Parameter(parametric.Parameter):
         
         if is_flag:
             if allowed_values is not None:
-                raise BaseError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
+                raise Error(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
             
             if multiple:
-                raise BaseError(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
+                raise Error(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
             
             behaviours.append(parametric.BooleanFlagBehaviour())
         else:
@@ -280,7 +280,7 @@ class Experiment:
                 self.param_manager.print_error(e)
                 sys.exit(1)
             else:
-                raise BaseError(e) from e
+                raise Error(e) from e
             
         self._run_experiment(param_values)
 
@@ -475,7 +475,7 @@ class ExperimentGroup:
                 self.param_manager.print_error(e)
                 sys.exit(1)
             else:
-                raise BaseError(e) from e
+                raise Error(e) from e
         
         experiments[exp_name].cli(argv_rest, exit_on_error=exit_on_error)
 
@@ -592,8 +592,8 @@ def parameter_decorator(
 
             return experiment
 
-        except (parametric.BaseError, BaseError) as e:
-            raise BaseError(e) from None
+        except (parametric.Error, Error) as e:
+            raise Error(e) from None
 
     return decorator
 
@@ -717,8 +717,8 @@ def parameter_group_decorator(name, *parameters):
                 experiment.__params_memo__.append(group)
 
             return experiment
-        except (parametric.BaseError, BaseError) as e:
-            raise BaseError(e) from None
+        except (parametric.Error, Error) as e:
+            raise Error(e) from None
 
 
     return decorator
@@ -749,8 +749,8 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
 
         return experiment
 
-    except (parametric.BaseError, BaseError) as e:
-        raise BaseError(e) from None
+    except (parametric.Error, Error) as e:
+        raise Error(e) from None
 
 
 def _group_constructor(main_function, name=None, inherit_params=None, group=None, inherit_params_from_group=True):
@@ -771,8 +771,8 @@ def _group_constructor(main_function, name=None, inherit_params=None, group=None
 
         return new_group
 
-    except (parametric.BaseError, BaseError) as e:
-        raise BaseError(e) from None
+    except (parametric.Error, Error) as e:
+        raise Error(e) from None
 
 
 def _read_params_memo(function, experiment_or_group):
@@ -784,7 +784,7 @@ def _read_params_memo(function, experiment_or_group):
             elif isinstance(param, ParameterGroup):
                 experiment_or_group.add_param_group(param)
             else:
-                raise BaseError(f"Unrecognized value '{param}' found in parameter "
+                raise Error(f"Unrecognized value '{param}' found in parameter "
                                 f"list of main function '{function.__name__}'.")
     
 
@@ -820,15 +820,15 @@ def _inherit_params(experiment, inherit_from):
                         if param.name not in existing_param_groups:
                             experiment.add_param_group(param)
                     else:
-                        raise BaseError(f"Unrecognized value '{param}' found in parameter "
+                        raise Error(f"Unrecognized value '{param}' found in parameter "
                                         f"list of function '{exp.__name__}'.")
                     
             else:
-                raise BaseError(f"Unknown value passed to 'inherit_params': {exp}")
+                raise Error(f"Unknown value passed to 'inherit_params': {exp}")
     except Exception as e:
         if isinstance(experiment, (Experiment, ExperimentGroup)):
             name = experiment.name
         else:
             name = experiment.__name__
 
-        raise BaseError(f"Error during parameter inhertience for '{name}': {e}")
+        raise Error(f"Error during parameter inhertience for '{name}': {e}")

@@ -121,7 +121,7 @@ def test_experiment_group():
         assert params["param2"] == "value"
         raise Exp2Ran()
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
         group.cli([], exit_on_error=False)
 
     with pytest.raises(Exp1Ran):
@@ -492,7 +492,7 @@ def test_param_group_inheritence():
     def group1(params):
         pass
     
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
         @pystematic.parameter(
             name="param1"
         )
@@ -500,7 +500,7 @@ def test_param_group_inheritence():
         def exp(params):
             pass
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
         @group1.experiment
         @pystematic.parameter(
             name="param1"
@@ -529,14 +529,14 @@ def test_group_multiple_inheritence():
         pass
 
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
         @pystematic.experiment(inherit_params=[exp1, exp2])
         def exp3(params):
             pass
 
 
 def test_param_group_duplicates():
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
         @pystematic.param_group("agroup",
             pystematic.parameter(
                 name="param1"
@@ -549,7 +549,7 @@ def test_param_group_duplicates():
         def exp(params):
             pass
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
         @pystematic.parameter(
             name="param1"
         )
@@ -562,7 +562,7 @@ def test_param_group_duplicates():
         def exp(params):
             pass
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
 
         @pystematic.param_group("agroup",
             pystematic.parameter(
@@ -578,7 +578,7 @@ def test_param_group_duplicates():
         def exp(params):
             pass
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
 
         @pystematic.param_group("agroup",
             pystematic.parameter(
@@ -594,7 +594,7 @@ def test_param_group_duplicates():
         def exp(params):
             pass
 
-    with pytest.raises(pystematic.core.BaseError):
+    with pytest.raises(pystematic.core.Error):
 
         @pystematic.param_group("agroup",
             pystematic.parameter(
