@@ -799,7 +799,7 @@ class CliHelpFormatter:
     def _print_optionals_help(self, optionals):
         grid = Table(
             box=None,
-            padding=(0, 1, 0, 0),
+            padding=(0, 1, 1, 0),
             show_header=False,
             show_footer=False,
             show_edge=False,
@@ -828,7 +828,7 @@ class CliHelpFormatter:
                 if param.required:
                     help += " [help_heading]Required.[/help_heading]"
 
-                grid.add_row(flags, nargs, help)
+                grid.add_row(flags, Padding(nargs, (0, 2)), help)
 
         self.console.print("[heading]Optional arguments:[/heading]")
         self.console.print(Padding(grid, (0, 1)))
