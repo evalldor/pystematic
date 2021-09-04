@@ -121,7 +121,7 @@ class StandardApi:
             self.params_file.__wrapped__ = pathlib.Path(params["subprocess"])
         else:
             self.output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], experiment.name)
-            self.params_file.__wrapped__ = self.output_dir.joinpath("parameters.yml")
+            self.params_file.__wrapped__ = self.output_dir.joinpath("parameters.yaml")
         
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
