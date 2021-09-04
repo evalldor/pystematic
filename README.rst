@@ -37,28 +37,19 @@ Defining and running experiments
 ================================
 
 Experiments and parameters are defined with decorators. The following example
-defines an experiment named ``example_experiment`` with two parameters,
-``string_param`` and ``int_param``:
+defines an experiment named ``hello_world`` with a single parameter ``name``:
 
 .. code-block:: python
 
-    import pystematic
-    
-    @pystematic.parameter(
-        name="string_param",
+    @ps.parameter(
+        name="name",
         type=str,
-        help="A string parameter"
+        help="The name to greet.",
+        required=True
     )
-    @pystematic.parameter(
-        name="int_param",
-        type=int,
-        help="An int parameter",
-        default=0
-    )
-    @pystematic.experiment
-    def example_experiment(params):
-        print("Hello from example_experiment.")
-        print(f"string_param is {params['string_param']} and int_param is {params['int_param']}.")
+    @ps.experiment
+    def hello_world(params):
+        print(f"Hello {params['name']}!")
 
 
 You can run the experiment either by supplying a dict containing the values for
@@ -66,25 +57,30 @@ the parameters:
 
 .. code-block:: python
 
-    example_experiment.run({
-        "string_param": "hello",
-        "int_param": 10
+    hello_world.run({
+        "name": "World",
     })
 
-Or you can run the experiment from the command line:
+or you can run the experiment from the command line by ivoking the ``cli()``
+method of the experiment:
 
 .. code-block:: python
 
     if __name__ == "__main__":
-        example_experiment.cli()
+        hello_world.cli()
 
 
-and then from the terminal:
+Then from the terminal you simply run:
 
 .. code-block:: 
 
-    $ python path/to/file.py --string-param hello --int-param 10
+    $ python path/to/file.py --name "World"
 
+
+Documentation
+-------------
+
+Full documentation is available at `<https://pystematic.readthedocs.io>`_.
 
 Extensions
 ----------
@@ -93,10 +89,7 @@ For running machine learning experiments in pytorch check out the
 `pystematic-torch <https://github.com/evalldor/pystematic-torch>`_ plugin.
 
 
-Documentation
--------------
 
-Full documentation is available at `<https://pystematic.readthedocs.io>`_.
 
 
 Related tools
