@@ -836,6 +836,7 @@ class CliHelpFormatter:
 
 _ParseResult = collections.namedtuple("_ParseResult", ["arg", "flag", "value"])
 
+
 class _ArgList:
     """This is a convenience wrapper for the argument list used when parsing.
     The main purpose is to allow for detailed paring errors by having access to
@@ -871,6 +872,7 @@ class _ArgList:
         self.curr_pos += 1
 
         return item
+
 
 class ParseError(BaseError):
     pass

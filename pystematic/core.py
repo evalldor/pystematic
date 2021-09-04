@@ -592,7 +592,7 @@ def parameter_decorator(
 
             return experiment
 
-        except parametric.BaseError or BaseError as e:
+        except (parametric.BaseError, BaseError) as e:
             raise BaseError(e) from None
 
     return decorator
@@ -717,7 +717,7 @@ def parameter_group_decorator(name, *parameters):
                 experiment.__params_memo__.append(group)
 
             return experiment
-        except parametric.BaseError or BaseError as e:
+        except (parametric.BaseError, BaseError) as e:
             raise BaseError(e) from None
 
 
@@ -749,7 +749,7 @@ def _experiment_constructor(main_function, name=None, inherit_params=None, defau
 
         return experiment
 
-    except parametric.BaseError or BaseError as e:
+    except (parametric.BaseError, BaseError) as e:
         raise BaseError(e) from None
 
 
@@ -771,7 +771,7 @@ def _group_constructor(main_function, name=None, inherit_params=None, group=None
 
         return new_group
 
-    except parametric.BaseError or BaseError as e:
+    except (parametric.BaseError, BaseError) as e:
         raise BaseError(e) from None
 
 
