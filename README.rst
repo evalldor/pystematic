@@ -82,14 +82,12 @@ Documentation
 
 Full documentation is available at `<https://pystematic.readthedocs.io>`_.
 
+
 Extensions
 ----------
 
 For running machine learning experiments in pytorch check out the
 `pystematic-torch <https://github.com/evalldor/pystematic-torch>`_ plugin.
-
-
-
 
 
 Related tools
