@@ -836,6 +836,41 @@ class CliHelpFormatter:
 
 _ParseResult = collections.namedtuple("_ParseResult", ["arg", "flag", "value"])
 
+class _ArgList:
+    """This is a convenience wrapper for the argument list used when parsing.
+    The main purpose is to allow for detailed paring errors by having access to
+    the whole argument list, and the currently processed token in the list.
+    """
+
+    def __init__(self, arg_list) -> None:
+        self.arg_list = arg_list
+        self.curr_pos = 0
+
+    def has_remaining(self):
+        """Returns num_remaining() > 0
+        """
+        return self.curr_pos < len(self.arg_list)
+
+    def num_remaining(self):
+        """Returns the numner of items not yet consumed.
+        """
+        return len(self.arg_list) - self.curr_pos
+
+    def get_remaining(self):
+        return self.arg_list[self.curr_pos:]
+
+    def peek(self):
+        """Returns the current item.
+        """
+        return self.arg_list[self.curr_pos]
+
+    def consume(self):
+        """Returns the current item and increments the counter by one.
+        """
+        item = self.arg_list[self.curr_pos]
+        self.curr_pos += 1
+
+        return item
 
 class ParseError(BaseError):
     pass
@@ -846,6 +881,8 @@ class UnknownOptionsFlag(ParseError):
 
 
 def parse_args(arg_list, positional_params, optional_params):
+    """Allows optionals to appear both before and after the chunk of positionals
+    """
 
     # A note on terminology: The arg list consists of 'tokens'. A token may be
     # either a 'flag' or a 'value'. A 'flag' indicates an option, and a 'value'
@@ -863,7 +900,7 @@ def parse_args(arg_list, positional_params, optional_params):
     # constraint that the succeeding parameters can be assigned the minimal
     # number of values they require. The semantics are the same as in argparse.
 
-    arg_list = list(arg_list) # Make mutable copy
+    arg_list = _ArgList(arg_list)
 
     parsed_optionals = []
 
@@ -880,7 +917,7 @@ def parse_args(arg_list, positional_params, optional_params):
         parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
     
     # Any remaining values are unrecognized 
-    if len(arg_list) > 0:
+    if arg_list.has_remaining():
         _parsing_error(arg_list, "Unrecognized value.")
 
     if len(positional_params) > 0:
@@ -898,7 +935,7 @@ def parse_known_args(arg_list, positional_params, optional_params):
     # that it cannot consume due to already having consumed the maximum number
     # of positional values.
 
-    arg_list = list(arg_list) # Make mutable copy
+    arg_list = _ArgList(arg_list) # Make mutable copy
 
     parsed_optionals = []
 
@@ -922,20 +959,20 @@ def parse_known_args(arg_list, positional_params, optional_params):
     else:
         parsed_positionals = []
 
-    return parsed_positionals + parsed_optionals, arg_list
+    return parsed_positionals + parsed_optionals, arg_list.get_remaining()
 
 
 def parse_intermixed_args(arg_list, positional_params, optional_params):
     # This function allows intermixing positional args with options
 
-    arg_list = list(arg_list) # Make mutable copy
+    arg_list = _ArgList(arg_list) # Make mutable copy
 
     parsed_optionals = []
     positional_values = []
     max_num_positional_values = _calculate_maximum_allowed_number_of_positional_values(positional_params)
     end_options_token_encountered = False
 
-    while len(arg_list) > 0:
+    while arg_list.has_remaining():
         if not end_options_token_encountered:
             parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
 
@@ -951,7 +988,7 @@ def parse_intermixed_args(arg_list, positional_params, optional_params):
         
 
     # Any remaining values are unrecognized 
-    if len(arg_list) > 0:
+    if arg_list.has_remaining():
         _parsing_error(arg_list, "Unrecognized value.")
 
     if len(positional_params) > 0:
@@ -965,7 +1002,7 @@ def parse_intermixed_args(arg_list, positional_params, optional_params):
 def parse_known_intermixed_args(arg_list, positional_params, optional_params):
     # This function allows intermixing positional args with options
 
-    arg_list = list(arg_list) # Make mutable copy
+    arg_list = _ArgList(arg_list) # Make mutable copy
 
     parsed_optionals = []
     positional_values = []
@@ -973,7 +1010,7 @@ def parse_known_intermixed_args(arg_list, positional_params, optional_params):
     end_options_token_encountered = False
 
     try:
-        while len(arg_list) > 0:
+        while arg_list.has_remaining():
             if not end_options_token_encountered:
                 parsed_optionals.extend(_consume_optionals(optional_params, arg_list))
             
@@ -994,7 +1031,7 @@ def parse_known_intermixed_args(arg_list, positional_params, optional_params):
     else:
         parsed_positionals = []
 
-    return parsed_positionals + parsed_optionals, arg_list
+    return parsed_positionals + parsed_optionals, arg_list.get_remaining()
 
 
 def parse_shared_args(arg_list, positional_params, optional_params):
@@ -1002,7 +1039,7 @@ def parse_shared_args(arg_list, positional_params, optional_params):
     # It parses a set of options and a chunk of positonal values, and leaves the
     # remainder for subcommands
 
-    arg_list = list(arg_list) # Make mutable copy
+    arg_list = _ArgList(arg_list) # Make mutable copy
 
     parsed_optionals = []
 
@@ -1019,13 +1056,13 @@ def parse_shared_args(arg_list, positional_params, optional_params):
     else:
         parsed_positionals = []
 
-    return parsed_positionals + parsed_optionals, arg_list
+    return parsed_positionals + parsed_optionals, arg_list.get_remaining()
 
 
 def _consume_optionals(optional_params, arg_list):
     parsed_optionals = []
 
-    while len(arg_list) > 0 and _is_flag(arg_list[0]):
+    while arg_list.has_remaining() and _is_flag(arg_list.peek()):
         parsed_optionals.extend(_parse_optional(optional_params, arg_list))
 
     return parsed_optionals
@@ -1035,15 +1072,15 @@ def _consume_positional_values(arg_list, max_num_values_to_consume, end_options_
     positional_values = []
     
     while (
-        len(arg_list) > 0 and 
+        arg_list.has_remaining() and 
         len(positional_values) < max_num_values_to_consume and 
-        (not _is_flag(arg_list[0]) or end_options_token_encountered)
+        (not _is_flag(arg_list.peek()) or end_options_token_encountered)
     ):
-        if not end_options_token_encountered and arg_list[0] == "--":
+        if not end_options_token_encountered and arg_list.peek() == "--":
             end_options_token_encountered = True
-            arg_list.pop(0)
+            arg_list.consume()
         else:
-            positional_values.append(arg_list.pop(0))
+            positional_values.append(arg_list.consume())
 
     return positional_values, end_options_token_encountered
 
@@ -1088,11 +1125,11 @@ def _parse_optional(optional_params, arg_list):
 
     # Postpone popping the flag until we are sure we can consume it
 
-    if "=" in arg_list[0]:
-        flag, value = arg_list[0].split("=", 1)
+    if "=" in arg_list.peek():
+        flag, value = arg_list.peek().split("=", 1)
         values = [value]
     else:
-        flag = arg_list[0]
+        flag = arg_list.peek()
         values = []
 
     parsed_options = []
@@ -1101,7 +1138,7 @@ def _parse_optional(optional_params, arg_list):
 
     if re.match(r"^--", flag): # Handle long flags
         param = get_param_for_flag(flag)
-        arg_list.pop(0)
+        arg_list.consume()
 
         values += _consume_optional_values(arg_list, param.nargs, num_already_consumed_values=len(values))
 
@@ -1113,7 +1150,7 @@ def _parse_optional(optional_params, arg_list):
         
         if len(flag) == 2: # We have a single shorthand flag
             param = get_param_for_flag(flag)
-            arg_list.pop(0)
+            arg_list.consume()
 
             values += _consume_optional_values(arg_list, param.nargs, num_already_consumed_values=len(values))
 
@@ -1133,7 +1170,7 @@ def _parse_optional(optional_params, arg_list):
                 arg = get_param_for_flag(flag)
                 parsed_options.append(_ParseResult(arg, flag, []))
 
-            arg_list.pop(0)
+            arg_list.consume()
 
     else:
         _parsing_error(arg_list, "Invalid flag encountered. This should never happen.")
@@ -1148,17 +1185,17 @@ def _consume_optional_values(arg_list, nargs, num_already_consumed_values=0):
     consumed_values = []
 
     if nargs == OPTIONAL:
-        if len(arg_list) > 0 and _is_value(arg_list[0]) and num_already_consumed_values == 0:
-            consumed_values.append(arg_list.pop(0))
+        if arg_list.has_remaining() and _is_value(arg_list.peek()) and num_already_consumed_values == 0:
+            consumed_values.append(arg_list.consume())
     elif nargs in [ZERO_OR_MORE, ONE_OR_MORE]:
-        while len(arg_list) > 0 and _is_value(arg_list[0]):
-            consumed_values.append(arg_list.pop(0))
+        while arg_list.has_remaining() and _is_value(arg_list.peek()):
+            consumed_values.append(arg_list.consume())
     else:
         if nargs is None:
             nargs = 1
         
-        while len(arg_list) > 0 and _is_value(arg_list[0]) and len(consumed_values) + num_already_consumed_values < nargs:
-            consumed_values.append(arg_list.pop(0))
+        while arg_list.has_remaining() and _is_value(arg_list.peek()) and len(consumed_values) + num_already_consumed_values < nargs:
+            consumed_values.append(arg_list.consume())
         
     return consumed_values
 
