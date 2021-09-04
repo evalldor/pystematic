@@ -280,7 +280,7 @@ class Experiment:
                 self.param_manager.print_error(e)
                 sys.exit(1)
             else:
-                raise e
+                raise BaseError(e) from e
             
         self._run_experiment(param_values)
 
@@ -469,13 +469,13 @@ class ExperimentGroup:
             exp_name = param_values["experiment"]
             
             if exp_name not in experiments:
-                raise BaseError(f"Invalid experiment name '{exp_name}'.")
+                raise ValueError(f"Invalid experiment name '{exp_name}'.")
         except Exception as e:
             if exit_on_error:
                 self.param_manager.print_error(e)
                 sys.exit(1)
             else:
-                raise e
+                raise BaseError(e) from e
         
         experiments[exp_name].cli(argv_rest, exit_on_error=exit_on_error)
 

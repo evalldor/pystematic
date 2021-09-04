@@ -8,7 +8,6 @@ import multiprocessing.connection
 import datetime
 import string
 import functools
-import inspect
 import itertools
 
 from rich.console import Console
