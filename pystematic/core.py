@@ -246,14 +246,14 @@ class Experiment:
         """
         return self.param_manager.get_groups()
 
-    def __call__(self, params):
+    def __call__(self, params={}):
         return self.run(params)
 
-    def run(self, params):
+    def run(self, params={}):
         """Runs the experiment in the current process with the provided parameters.
 
         Args:
-            params (dict): A dict containing the values for the parameters.
+            params (dict, optional): A dict containing values for the parameters. Defaults to {}.
         """
         param_values = self.param_manager.from_dict(params)
         self._run_experiment(param_values)

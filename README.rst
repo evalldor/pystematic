@@ -17,7 +17,8 @@ Quickstart
 Installation
 ============
 
-pystematic is available on pypi, and can be installed with your package manager of choice.
+pystematic is available on `pypi <https://pypi.org/project/pystematic/>`_, and
+can be installed with your package manager of choice.
 
 If using poetry:
 
@@ -26,7 +27,7 @@ If using poetry:
     $ poetry add pystematic
 
     
-or just pip:
+or with pip:
 
 .. code-block:: 
 
@@ -36,8 +37,9 @@ or just pip:
 Defining and running experiments
 ================================
 
-Experiments and parameters are defined with decorators. The following example
-defines an experiment named ``hello_world`` with a single parameter ``name``:
+Experiments and parameters are defined by decorating the main function of the
+experiment. The following example defines an experiment named ``hello_world``
+with a single parameter ``name``:
 
 .. code-block:: python
 
@@ -61,7 +63,7 @@ the parameters:
         "name": "World",
     })
 
-or you can run the experiment from the command line by ivoking the ``cli()``
+or you can run the experiment from the command line by iNvoking the ``cli()``
 method of the experiment:
 
 .. code-block:: python
