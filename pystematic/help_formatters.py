@@ -20,8 +20,9 @@ class GroupHelpFormatter(parametric.HelpFormatter):
 
     def print_help(self, param_manager):
         super().print_help(param_manager)
-        print()
+        
         self._print_experiments()
+        self.console.print()
 
     def print_error(self, error:Exception):
         self.console.print(f"[error]Error:[/error] {error} Use [flag]-h[/flag] for help.")
