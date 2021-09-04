@@ -128,12 +128,13 @@ avoid mixing up outputs from different runs.
 
 If you look into the output directory of one of the experiment runs you will
 also notice that there is a file there named ``parameters.yaml``. This file
-contains the value of all parameters when the experiment was run. 
+contains the values of all parameters when the experiment was run. This is
+extremely useful when you run an experiment many times with different set of
+parameters.
 
 When an experiment is run, this newly created output directory is bound to the
 :data:`pystematic.output_dir` property. All data that you want to output from
-the experiment should be written to this directory. It is your responsibly to
-make sure that relevant output is written to this directory.
+the experiment should be written to this directory.
 
 
 Managing random numbers
@@ -183,7 +184,6 @@ Take the following as an example:
 .. code-block:: python
 
    import pystematic as ps
-
 
    @ps.experiment
    def prepare_dataset(params):
