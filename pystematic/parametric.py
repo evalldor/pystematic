@@ -388,7 +388,7 @@ class OptionGroup:
     def add_parameter(self, param: Parameter):
         if param.cli_positional:
             raise Error(f"Error when adding parameter '{param.name}' to group '{self.name}': "
-                            "option groups cannot contain CLI positional parameters.")
+                        "option groups cannot contain CLI positional parameters.")
 
         _check_for_clash_with_existing_params(param, self._parameters)
 
@@ -452,12 +452,12 @@ def _check_for_clash_with_existing_params(param, existing_params):
     for existing_param in existing_params:
         if existing_param.name == param.name:
             raise Error(f"Error when adding parameter '{param.name}': a parameter with the same name "
-                                "has already been added.")
+                        "has already been added.")
         
         clashing_flags = set(existing_param.flags).intersection(param.flags)
         if len(clashing_flags) > 0:
             raise Error(f"Error when adding parameter '{param.name}': the parameter {existing_param.name} "
-                                f"also has flags '{clashing_flags}'.")
+                        f"also has flags '{clashing_flags}'.")
 
 
 def _unique_params(*parameter_lists):
@@ -568,7 +568,7 @@ class ParameterManager:
         for existing_group in self._groups:
             if existing_group.name == group.name:
                 raise Error(f"Error when adding group '{group.name}': a group with that "
-                                "name has already been added.")
+                            "name has already been added.")
 
         group_copy = OptionGroup(group.name, group.help, group._parameters)
 

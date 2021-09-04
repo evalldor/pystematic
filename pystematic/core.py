@@ -168,10 +168,12 @@ class Parameter(parametric.Parameter):
         
         if is_flag:
             if allowed_values is not None:
-                raise Error(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'allowed_values'.")
+                raise Error(f"Error in parameter declaration for '{name}': "
+                            "'is_flag' is incompatible with 'allowed_values'.")
             
             if multiple:
-                raise Error(f"Error in parameter declaration for '{name}': 'is_flag' is incompatible with 'multiple'.")
+                raise Error(f"Error in parameter declaration for '{name}': "
+                            "'is_flag' is incompatible with 'multiple'.")
             
             behaviours.append(parametric.BooleanFlagBehaviour())
         else:
@@ -821,7 +823,7 @@ def _inherit_params(experiment, inherit_from):
                             experiment.add_param_group(param)
                     else:
                         raise Error(f"Unrecognized value '{param}' found in parameter "
-                                        f"list of function '{exp.__name__}'.")
+                                    f"list of function '{exp.__name__}'.")
                     
             else:
                 raise Error(f"Unknown value passed to 'inherit_params': {exp}")
