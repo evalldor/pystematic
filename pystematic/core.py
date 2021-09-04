@@ -218,7 +218,7 @@ class Experiment:
         self.param_manager = parametric.ParameterManager(
             defaults_override=defaults_override,
             add_cli_help_option=True,
-            cli_help_formatter=help_formatters.ExperimentHelpFormatter()
+            help_formatter=help_formatters.ExperimentHelpFormatter()
         )
 
     def add_parameter(self, param):
@@ -335,7 +335,7 @@ class ExperimentGroup:
 
         self.param_manager = parametric.ParameterManager(
             add_cli_help_option=True,
-            cli_help_formatter=help_formatters.GroupHelpFormatter(self)
+            help_formatter=help_formatters.GroupHelpFormatter(self)
         )
         
         self.param_manager.add_param(

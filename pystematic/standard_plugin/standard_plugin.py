@@ -1,4 +1,3 @@
-from operator import sub
 import wrapt
 import pathlib
 import random
@@ -342,7 +341,7 @@ standard_params = [
         type=pathlib.Path,
         help="Read experiment parameters from a yaml file, such as the one "
         "dumped in the output dir from an eariler run. When this option is "
-        "set from the command line, any other options supplied AFTER this one "
+        "set from the command line, any other options supplied after this one "
         "will override the ones loaded from the file.",
         behaviour=ParamsFileBehaviour(),
         allow_from_file=False

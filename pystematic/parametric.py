@@ -397,6 +397,9 @@ class OptionGroup:
     def get_parameters(self):
         return [param for param in self._parameters if not param.cli_only]
 
+    def get_cli_optionals(self):
+        return [param for param in self._parameters if param.cli_enabled and not param.cli_positional]
+
     def add_param(
         self,
         name: str,
@@ -481,7 +484,7 @@ class ParameterManager:
         defaults_override={}, 
         env_prefix: str = None, 
         env_value_separators: str = ":,",
-        cli_help_formatter = None,
+        help_formatter = None,
         add_cli_help_option: bool = True,
     ) -> None:
 
@@ -493,7 +496,7 @@ class ParameterManager:
         self.env_prefix = env_prefix
         self.env_value_separators = env_value_separators
 
-        self.cli_help_formatter = cli_help_formatter or HelpFormatter()
+        self.help_formatter = help_formatter or HelpFormatter(self)
 
         if add_cli_help_option:
             self.add_param(
@@ -585,6 +588,12 @@ class ParameterManager:
 
     def get_all_parameters(self):
         return _unique_params(self._parameters, *[group._parameters for group in self._groups])
+
+    def get_all_ungrouped_parameters(self):
+        return list(self._parameters)
+
+    def get_ungrouped_cli_optionals(self):
+        return [param for param in self.get_all_ungrouped_parameters() if param.cli_enabled and not param.cli_positional]
 
     def get_parameters(self):
         return [param for param in self.get_all_parameters() if not param.cli_only]
@@ -697,13 +706,13 @@ class ParameterManager:
         return dict(result_dict)
 
     def print_cli_usage(self):
-        self.cli_help_formatter.print_usage(self.get_cli_positionals(), self.get_cli_optionals())
+        self.help_formatter.print_usage(self)
 
     def print_cli_help(self):
-        self.cli_help_formatter.print_help(self.get_cli_positionals(), self.get_cli_optionals())
+        self.help_formatter.print_help(self)
 
     def print_error(self, e: Exception):
-        self.cli_help_formatter.print_error(e)
+        self.help_formatter.print_error(e)
 
 
 
@@ -718,7 +727,7 @@ from rich.theme import Theme
 class HelpFormatter:
 
     def __init__(self, no_style=False) -> None:
-
+        
         if no_style:
             theme = Theme({}, inherit=False)
         
@@ -735,7 +744,8 @@ class HelpFormatter:
 
         self.console = Console(theme=theme)
 
-    def print_usage(self, positionals, optionals):
+    def print_usage(self, param_manager: ParameterManager):
+        positionals = param_manager.get_cli_positionals()
         positionals_usage = []
 
         for param in positionals:
@@ -744,13 +754,17 @@ class HelpFormatter:
         self.console.print("[heading]Usage:[/heading]")
         self.console.print(Padding(f"{os.path.basename(sys.argv[0])} [OPTIONS] {' '.join(positionals_usage)}", (0, 1)))
 
-    def print_help(self, positionals, optionals):
-        self.print_usage(positionals, optionals)
+    def print_help(self, param_manager: ParameterManager):
+        self.print_usage(param_manager)
         self.console.print()
+
+        positionals = param_manager.get_cli_positionals()
 
         if len(positionals) > 0:
             self._print_positionals_help(positionals)
             self.console.print()
+
+        optionals = param_manager.get_cli_optionals()
         
         if len(optionals) > 0:
             self._print_optionals_help(optionals)
