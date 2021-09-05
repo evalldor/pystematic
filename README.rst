@@ -63,7 +63,7 @@ the parameters:
         "name": "World",
     })
 
-or you can run the experiment from the command line by iNvoking the ``cli()``
+or you can run the experiment from the command line by invoking the ``cli()``
 method of the experiment:
 
 .. code-block:: python
