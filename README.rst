@@ -1,9 +1,15 @@
 .. |python| image:: https://img.shields.io/pypi/pyversions/pystematic?style=for-the-badge
-.. |pypi| image:: https://img.shields.io/pypi/v/pystematic?style=for-the-badge
-.. |test| image:: https://img.shields.io/github/workflow/status/evalldor/pystematic/Test?style=for-the-badge
-.. |rtd| image:: https://readthedocs.org/projects/pystematic/badge/?version=latest&style=for-the-badge
 
-|python| |pypi| |test| |rtd|
+.. |pypi| image:: https://img.shields.io/pypi/v/pystematic?style=for-the-badge
+.. _pypi: https://pypi.org/project/pystematic/
+
+.. |test| image:: https://img.shields.io/github/workflow/status/evalldor/pystematic/Test?style=for-the-badge
+.. _test: https://github.com/evalldor/pystematic/actions/workflows/test.yaml
+
+.. |rtd| image:: https://readthedocs.org/projects/pystematic/badge/?style=for-the-badge
+.. _rtd: https://pystematic.readthedocs.io
+
+|python| |pypi|_ |test|_ |rtd|_
 
 Pystematic is a lightweight framework that helps you to systematically setup and
 run reproducible computational experiments in python. 
