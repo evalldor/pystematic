@@ -35,7 +35,7 @@ class GroupHelpFormatter(parametric.HelpFormatter):
             show_header=False,
             show_footer=False,
             show_edge=False,
-            width=100
+            width=80
         )
 
         grid.add_column()
@@ -81,7 +81,7 @@ class ExperimentHelpFormatter(parametric.HelpFormatter):
             show_header=False,
             show_footer=False,
             show_edge=False,
-            width=100,
+            width=80,
         )
 
         grid.add_column()
