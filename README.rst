@@ -97,10 +97,7 @@ Related tools
 
 Other related tools that might interest you:
 
-* `Aim <https://github.com/aimhubio/aim>`_: record, search and compare 1000s of
-  ML training runs.
-
 * `Hydra <https://github.com/facebookresearch/hydra>`_: a framework for elegantly
   configuring complex applications.
 
-* `MLflow <https://github.com/mlflow/mlflow>`_: a machine learning lifecycle platform.
+* `Click <https://github.com/pallets/click>`_: Python composable command line interface toolkit 
