@@ -94,6 +94,13 @@ def test_parametric():
     )
 
     params.add_param(
+        name="pos_5", 
+        nargs="?",
+        help="A positional arg 5",
+        cli_positional=True
+    )
+
+    params.add_param(
         name="string_param",
         flags=["--string-param"],
         help="A string parameter used for testing.",
@@ -146,6 +153,7 @@ def test_parametric():
     assert res["pos_2"] == []
     assert res["pos_3"] == ["odn", "fpo", "sdnf"]
     assert res["pos_4"] == ["--flag-param"]
+    assert res["pos_5"] is None
 
     res = params.from_cli(["--multiple-str", "asd", "asdasd", "-p", "woot", "--", "odn", "fpo", "sdnf", "--flag-param"])
     assert res["multiple_str"] == ["asd", "asdasd"]
@@ -153,6 +161,7 @@ def test_parametric():
     assert res["pos_2"] == []
     assert res["pos_3"] == ["odn", "fpo", "sdnf"]
     assert res["pos_4"] == ["--flag-param"]
+    assert res["pos_5"] is None
 
     res = params.from_cli(["woot", "odn", "fpo", "sdnf", "asd", "-fp", "--float-param=3.14", "--int-param", "3", 
                             "--multiple-str", "asd", "asdasd", "--flag-param", "1"])
@@ -161,6 +170,7 @@ def test_parametric():
     assert res["pos_2"] == []
     assert res["pos_3"] == ["odn", "fpo", "sdnf"]
     assert res["pos_4"] == ["asd"]
+    assert res["pos_5"] is None
     assert res["pure_flag"] is None
     assert res["string_param"] == "hello"
     assert res["int_param"] == 3
@@ -184,6 +194,37 @@ def test_parametric():
 
     # print()
     # params.print_cli_help()
+
+def test_positionals():
+    params = parametric.ParameterManager()
+
+    params.add_param(
+        name="pos_1",
+        help="A positional arg",
+        cli_positional=True
+    )
+    params.add_param(
+        name="pos_2", 
+        nargs="?",
+        help="A positional arg 2",
+        cli_positional=True
+    )
+    params.add_param(
+        name="pos_3", 
+        nargs="+",
+        help="A positional arg 3",
+        cli_positional=True
+    )
+
+    res = params.from_cli(["value1", "value2"])
+    assert res["pos_1"] == "value1"
+    assert res["pos_2"] == None
+    assert res["pos_3"] == ["value2"]
+
+    res = params.from_cli(["value1", "value2", "value3", "value4"])
+    assert res["pos_1"] == "value1"
+    assert res["pos_2"] == "value2"
+    assert res["pos_3"] == ["value3", "value4"]
 
 def test_flag_param():
     params = parametric.ParameterManager()

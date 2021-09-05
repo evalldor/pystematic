@@ -509,6 +509,28 @@ def test_param_group_inheritence():
             pass
 
 
+def test_multiple_inheritence():
+
+    @pystematic.parameter(
+        name="param_exp1"
+    )
+    def exp1(params):
+        pass
+
+    @pystematic.param_group(
+        pystematic.parameter(
+            name="param_exp2"
+        )
+    )
+    def exp2(params):
+        pass
+
+
+    @pystematic.experiment(inherit_params=[exp1, exp2])
+    def exp3(params):
+        pass
+
+
 def test_group_multiple_inheritence():
     @pystematic.param_group("group_a",
         pystematic.parameter(
@@ -639,3 +661,48 @@ def _sweep_exp(params):
     time.sleep(0.1)
     logger.info("END")
 
+
+def test_load_param_file():
+
+    class ExpRan(Exception):
+        pass
+
+    @pystematic.parameter(
+        name="param1",
+        type=str
+    )
+    @pystematic.parameter(
+        name="param2",
+        type=int
+    )
+    @pystematic.experiment
+    def exp1(params):
+        assert params["param1"] == "hello"
+        assert params["param2"] == 10
+        assert str(params["params_file"]) == "tests/resources/params1.yaml"
+        raise ExpRan
+
+    with pytest.raises(ExpRan):
+        exp1.run({
+            "params_file": "tests/resources/params1.yaml"
+        })
+
+    @pystematic.parameter(
+        name="param1",
+        type=str
+    )
+    @pystematic.parameter(
+        name="param2",
+        type=int
+    )
+    @pystematic.experiment
+    def exp2(params):
+        assert params["param1"] == "world"
+        assert params["param2"] == 20
+        assert str(params["params_file"]) == "tests/resources/params2.yaml"
+        raise ExpRan
+
+    with pytest.raises(ExpRan):
+        exp2.run({
+            "params_file": "tests/resources/params2.yaml"
+        })

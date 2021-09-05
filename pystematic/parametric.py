@@ -1231,7 +1231,7 @@ def _assign_values_to_positionals(positional_params, positional_values):
 
     curr_param_index = 0
     
-    while get_num_assigned_values() < len(positional_values) and curr_param_index < len(positional_values):
+    while get_num_assigned_values() < len(positional_values) and curr_param_index < len(positional_params):
         param = positional_params[curr_param_index]
 
         if param.nargs == OPTIONAL:
@@ -1252,7 +1252,7 @@ def _assign_values_to_positionals(positional_params, positional_values):
 
     # If there are any values left, we assign them to the variable length
     # parameters from left to right
-
+    curr_param_index = 0
     while get_num_assigned_values() < len(positional_values) and curr_param_index < len(positional_params):
         param = positional_params[curr_param_index]
 
@@ -1270,7 +1270,8 @@ def _assign_values_to_positionals(positional_params, positional_values):
             # filled in the previous step
             curr_param_index += 1
     
-    assert get_num_assigned_values() == len(positional_values), "Internal error, too many positional values passed to '_assign_values_to_positionals'."
+    assert get_num_assigned_values() == len(positional_values), (f"Internal error, too many positional values "
+        f"passed to '_assign_values_to_positionals' {get_num_assigned_values()} != {len(positional_values)}.")
 
     value_indices = list(itertools.accumulate(num_assigned_values_per_param.values()))
     value_indices.insert(0, 0)

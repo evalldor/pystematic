@@ -29,6 +29,7 @@ sphinx-rtd-theme = "^0.5.2"
 Sphinx = "^4.1.2"
 sphinxcontrib-napoleon = "^0.7"
 pytest = "^6.2.4"
+pytest-cov = "^2.12.1"
 
 [tool.poetry.plugins."pystematic.plugins"]
 "pystematic-standard" = "pystematic.standard_plugin:StandardPlugin"

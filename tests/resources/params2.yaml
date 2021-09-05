@@ -1,0 +1,3 @@
+param1: "world"
+param2: 20
+params_file: "tests/resources/params1.yaml"
