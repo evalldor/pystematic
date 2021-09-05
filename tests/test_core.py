@@ -1,5 +1,5 @@
 import time
-
+import pathlib
 import pytest
 import pystematic
 import pystematic.core
@@ -679,7 +679,7 @@ def test_load_param_file():
     def exp1(params):
         assert params["param1"] == "hello"
         assert params["param2"] == 10
-        assert str(params["params_file"]) == "tests/resources/params1.yaml"
+        assert params["params_file"] == pathlib.Path("tests/resources/params1.yaml")
         raise ExpRan
 
     with pytest.raises(ExpRan):
@@ -699,7 +699,7 @@ def test_load_param_file():
     def exp2(params):
         assert params["param1"] == "world"
         assert params["param2"] == 20
-        assert str(params["params_file"]) == "tests/resources/params2.yaml"
+        assert params["params_file"] == pathlib.Path("tests/resources/params2.yaml")
         raise ExpRan
 
     with pytest.raises(ExpRan):
