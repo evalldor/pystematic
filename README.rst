@@ -97,7 +97,9 @@ Related tools
 
 Other related tools that might interest you:
 
-* `Hydra <https://github.com/facebookresearch/hydra>`_: a framework for elegantly
-  configuring complex applications.
+* `MLflow <https://github.com/mlflow/mlflow>`_: a machine learning lifecycle platform.
 
-* `Click <https://github.com/pallets/click>`_: Python composable command line interface toolkit 
+* `Hydra <https://github.com/facebookresearch/hydra>`_: a framework for
+  elegantly configuring complex applications.
+
+* `Click <https://github.com/pallets/click>`_: Python composable command line interface toolkit.
