@@ -27,6 +27,8 @@ The main function must take a single argument which is a dict containing the
 experiment parameters. 
 
 
+Running experiments
+-------------------
 
 To run the experiment you have a couple of different options. The simplest one
 is to run the experiment by with the :meth:`pystematic.core.Experiment.run` method:
@@ -63,6 +65,7 @@ you will see that the experiment is run.
    experiment in a new process, which can be done with the method
    :meth:`pystematic.core.Experiment.run_in_new_process`.
 
+
 Adding parameters
 -----------------
 
@@ -95,6 +98,17 @@ The code above adds a string parameter named ``string_to_print`` with a default
 value, and a description of the parameter. When we run the experiment - either
 programmatically or from the command line - we can set a value for the
 parameter.
+
+
+Experiment API
+--------------
+
+Pystematic provides a set of functions designated for the currently running
+experiment, referred to as the :ref:`Experiment API<apidoc:experiment api>`. The
+API consists of a set of functions and attributed that provides functionality
+such as launching sub-processes and generating reproducible random seeds. Any
+installed extension also extends the experiment api with its own set of functions.
+
 
 A note on naming conventions
 ----------------------------

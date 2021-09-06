@@ -13,33 +13,6 @@ Decorators
 .. autodecorator:: pystematic.param_group(name, help=None, *parameters)
 
 
-Core types
-----------
-
-These classes are not supposed to be instantiated manually, but only through
-their corresponding decorators.
-
-.. autoclass:: pystematic.core.Experiment
-  :members: get_param_groups, get_parameters, run, cli, run_in_new_process
-  :undoc-members:
-
-.. autoclass:: pystematic.core.ExperimentGroup
-  :members: experiment, group, cli, get_parameters, get_param_groups
-  :undoc-members:
-
-.. autoclass:: pystematic.core.Parameter
-  :members: 
-  :undoc-members:
-
-.. autoclass:: pystematic.core.ParameterGroup
-  :members: 
-  :undoc-members:
-
-.. autoclass:: pystematic.core.PystematicApp
-  :members: get_api_object, on_experiment_created, on_before_experiment, on_after_experiment
-  :undoc-members:
-
-
 Experiment API
 --------------
 
@@ -47,8 +20,8 @@ The experiment API is available for the currently running experiment. The use of
 the API when no experiment is running results in undefined behavior. 
 
 
-Global attributes
-+++++++++++++++++
+Attributes
+++++++++++
 
 These attributes holds information related to the current experiment. Note that
 they are uninitialized until an experiment has actually started.
@@ -107,3 +80,30 @@ these are also listed if you run an experiment from the command line with the
 
 * ``debug``: Sets debug flag ON/OFF. Configures the python logging mechanism to
   print all DEBUG messages. Default value is ``False``.
+
+
+Core types
+----------
+
+These classes are not supposed to be instantiated manually, but only through
+their corresponding decorators.
+
+.. autoclass:: pystematic.core.Experiment
+  :members: get_param_groups, get_parameters, run, cli, run_in_new_process
+  :undoc-members:
+
+.. autoclass:: pystematic.core.ExperimentGroup
+  :members: experiment, group, cli, get_parameters, get_param_groups
+  :undoc-members:
+
+.. autoclass:: pystematic.core.Parameter
+  :members: 
+  :undoc-members:
+
+.. autoclass:: pystematic.core.ParameterGroup
+  :members: 
+  :undoc-members:
+
+.. autoclass:: pystematic.core.PystematicApp
+  :members: get_api_object, on_experiment_created, on_before_experiment, on_after_experiment
+  :undoc-members:
