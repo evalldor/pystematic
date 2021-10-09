@@ -6,6 +6,8 @@ import typing
 import typing_extensions
 import importlib_metadata
 import logging
+import inspect
+import warnings
 
 from . import parametric
 from . import help_formatters
@@ -119,12 +121,26 @@ class PystematicApp:
         for callback, priority in sorted(self._before_experiment_callbacks, key=lambda x: x[1]):
             callback(experiment, params)
 
-    def after_experiment(self):
+    def after_experiment(self, error):
         """Triggers the after_experiment event. Internal.
         """
         
         for callback, priority in sorted(self._after_experiment_callbacks, key=lambda x: x[1]):
-            callback()
+            # for backwards compatibility
+            has_new_signature = False
+            sig = inspect.signature(callback)
+            
+            for name, param in sig.parameters.items():
+                if param.kind not in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD):
+                    has_new_signature = True
+                    break
+
+            if has_new_signature:
+                callback(error)
+            else:
+                warnings.warn(f"Callback {callback.__qualname__} has an old signature which "
+                            "will be deprecated in a future release.", DeprecationWarning)
+                callback()
 
         self._active_experiment = None
 
@@ -310,11 +326,15 @@ class Experiment:
         return proc
     
     def _run_experiment(self, params):
+        app.before_experiment(self, params)
+
         try:
-            app.before_experiment(self, params)
             self.main_function(params)
-        finally:
-            app.after_experiment()
+        except BaseException as e:
+            app.after_experiment(e)
+            raise e
+        else:
+            app.after_experiment(None)
 
 
 def _entry_point_run_in_new_process(experiment_module, experiment_name, params):

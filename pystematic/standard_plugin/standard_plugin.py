@@ -58,6 +58,13 @@ def _create_log_dir_name(output_dir, experiment_name):
     return directory
 
 
+def _get_log_file_name(output_dir, local_rank):
+    if local_rank == 0:
+        return output_dir.joinpath("log.txt")
+    
+    return output_dir.joinpath(f"log.rank-{local_rank}.txt")
+
+
 class StandardLogHandler(logging.Handler):
 
     def __init__(self, file_path, no_style=False):
@@ -84,9 +91,11 @@ class StandardLogHandler(logging.Handler):
         level = f"[{record.levelname.lower()}]{level_str}[/{record.levelname.lower()}]"
         msg = f"{record.getMessage()}"
 
+        
+
         name = f"[name]\[{record.name}][/name]"
         
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record.created))
+        time_str = datetime.datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S')
 
         if pystematic.local_rank() > 0 or pystematic.subprocess_counter > 0:
             rank = f"[rank][RANK {pystematic.local_rank()}][/rank]"
@@ -96,6 +105,10 @@ class StandardLogHandler(logging.Handler):
         else:
             self.console_output.print(f"{level} {name} {msg}")
             self.file_output.print(f"[{time_str}] {level} {name} {msg}")
+        
+        if record.exc_info:
+            self.console_output.print_exception(show_locals=True, suppress=[core])
+            self.file_output.print_exception(show_locals=True, suppress=[core])
 
     def close(self):
         self.file_handle.close()
@@ -104,12 +117,12 @@ class StandardLogHandler(logging.Handler):
 class StandardApi:
 
     def __init__(self) -> None:
-        self.current_experiment = wrapt.ObjectProxy(None)
+        self.current_experiment : core.Experiment = wrapt.ObjectProxy(None)
         self.params: dict = wrapt.ObjectProxy(None)
         self.output_dir: pathlib.Path = wrapt.ObjectProxy(None)
         self.params_file: pathlib.Path = wrapt.ObjectProxy(None)
         self.random_gen: random.Random = wrapt.ObjectProxy(None)
-        self.subprocess_counter: int = wrapt.ObjectProxy(0)
+        self.subprocess_counter: int = wrapt.ObjectProxy(None)
 
         self._log_handler = None
 
@@ -117,7 +130,8 @@ class StandardApi:
         self.subprocess_counter.__wrapped__ = 0
         self.current_experiment.__wrapped__ = experiment
         self.params.__wrapped__ = params
-    
+        self.random_gen.__wrapped__ = random.Random(params["random_seed"])
+
         if self.params["debug"]:
             log_level = "DEBUG"
         else:
@@ -125,15 +139,13 @@ class StandardApi:
 
 
         if params["subprocess"]:
-            
             assert params["local_rank"] > 0
+
             self.output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
             self.params_file.__wrapped__ = pathlib.Path(params["subprocess"])
 
-            log_file = self.output_dir.joinpath(f"log-rank-{params['local_rank']}.txt")
-            self._log_handler = StandardLogHandler(log_file)
-
-            logging.basicConfig(level=log_level, handlers=[self._log_handler])
+            self._log_handler = StandardLogHandler(_get_log_file_name(self.output_dir, params["local_rank"]))
+            logging.basicConfig(level=log_level, handlers=[self._log_handler], force=True)
 
             logger.debug(f"Initializing subprocess...")
         else:
@@ -142,18 +154,18 @@ class StandardApi:
         
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
-            log_file = self.output_dir.joinpath(f"log.txt")
-            self._log_handler = StandardLogHandler(log_file)
-
-            logging.basicConfig(level=log_level, handlers=[self._log_handler])
+            self._log_handler = StandardLogHandler(_get_log_file_name(self.output_dir, params["local_rank"]))
+            logging.basicConfig(level=log_level, handlers=[self._log_handler], force=True)
 
             logger.debug(f"Writing parameters file to '{self.params_file}'.")
+            
             with self.params_file.open("w") as f:
                 yaml.dump(params, f)
-
-        self.random_gen.__wrapped__ = random.Random(params["random_seed"])
-
-    def _after_experiment(self):
+        
+    def _after_experiment(self, error=None):
+        
+        if error is not None:
+            logger.error(f"Experiment ended with an error.", exc_info=error)
 
         self._log_handler.close()
 
