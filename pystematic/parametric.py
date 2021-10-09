@@ -1120,7 +1120,7 @@ def _calculate_maximum_allowed_number_of_positional_values(positional_params):
         elif param.nargs == ONE_OR_MORE:
             max_num_values += float("inf")
         else:
-            max_num_values += param.nargs or 1
+            max_num_values += param.nargs if param.nargs is not None else 1
     
     return max_num_values
 

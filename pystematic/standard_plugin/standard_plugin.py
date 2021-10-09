@@ -8,6 +8,7 @@ import datetime
 import string
 import functools
 import itertools
+import time
 
 from rich.console import Console
 from rich.theme import Theme
@@ -59,7 +60,7 @@ def _create_log_dir_name(output_dir, experiment_name):
 
 class StandardLogHandler(logging.Handler):
 
-    def __init__(self, no_style=False):
+    def __init__(self, file_path, no_style=False):
         super().__init__()
         theme = Theme({
             'debug':    'magenta',
@@ -74,7 +75,9 @@ class StandardLogHandler(logging.Handler):
         if no_style:
             theme = Theme({}, inherit=False)
 
-        self.console = Console(theme=theme)
+        self.console_output = Console(theme=theme)
+        self.file_handle = file_path.open("a")
+        self.file_output = Console(file=self.file_handle)
 
     def handle(self, record):
         level_str = escape(f"[{record.levelname}]")
@@ -82,12 +85,20 @@ class StandardLogHandler(logging.Handler):
         msg = f"{record.getMessage()}"
 
         name = f"[name]\[{record.name}][/name]"
+        
+        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record.created))
 
         if pystematic.local_rank() > 0 or pystematic.subprocess_counter > 0:
             rank = f"[rank][RANK {pystematic.local_rank()}][/rank]"
-            self.console.print(f"{level} {rank} {name} {msg}")
+
+            self.console_output.print(f"{level} {rank} {name} {msg}")
+            self.file_output.print(f"[{time_str}] {level} {rank} {name} {msg}")
         else:
-            self.console.print(f"{level} {name} {msg}")
+            self.console_output.print(f"{level} {name} {msg}")
+            self.file_output.print(f"[{time_str}] {level} {name} {msg}")
+
+    def close(self):
+        self.file_handle.close()
 
 
 class StandardApi:
@@ -100,6 +111,8 @@ class StandardApi:
         self.random_gen: random.Random = wrapt.ObjectProxy(None)
         self.subprocess_counter: int = wrapt.ObjectProxy(0)
 
+        self._log_handler = None
+
     def _before_experiment(self, experiment, params):
         self.subprocess_counter.__wrapped__ = 0
         self.current_experiment.__wrapped__ = experiment
@@ -110,18 +123,29 @@ class StandardApi:
         else:
             log_level = "INFO"
 
-        logging.basicConfig(level=log_level, handlers=[StandardLogHandler()])
 
         if params["subprocess"]:
-            logger.debug(f"Initializing subprocess...")
+            
             assert params["local_rank"] > 0
             self.output_dir.__wrapped__ = pathlib.Path(params["subprocess"]).parent
             self.params_file.__wrapped__ = pathlib.Path(params["subprocess"])
+
+            log_file = self.output_dir.joinpath(f"log-rank-{params['local_rank']}.txt")
+            self._log_handler = StandardLogHandler(log_file)
+
+            logging.basicConfig(level=log_level, handlers=[self._log_handler])
+
+            logger.debug(f"Initializing subprocess...")
         else:
             self.output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], experiment.name)
             self.params_file.__wrapped__ = self.output_dir.joinpath("parameters.yaml")
         
             self.output_dir.mkdir(parents=True, exist_ok=True)
+
+            log_file = self.output_dir.joinpath(f"log.txt")
+            self._log_handler = StandardLogHandler(log_file)
+
+            logging.basicConfig(level=log_level, handlers=[self._log_handler])
 
             logger.debug(f"Writing parameters file to '{self.params_file}'.")
             with self.params_file.open("w") as f:
@@ -130,6 +154,9 @@ class StandardApi:
         self.random_gen.__wrapped__ = random.Random(params["random_seed"])
 
     def _after_experiment(self):
+
+        self._log_handler.close()
+
         procs = multiprocessing.active_children()
         for proc in procs:
             try:

@@ -1,6 +1,6 @@
 .. image:: https://img.shields.io/pypi/pyversions/pystematic?style=for-the-badge
     :target: https://pypi.org/project/pystematic/
-    
+
 .. image:: https://img.shields.io/pypi/v/pystematic?style=for-the-badge
     :target: https://pypi.org/project/pystematic/
 
@@ -9,6 +9,7 @@
 
 .. image:: https://readthedocs.org/projects/pystematic/badge/?style=for-the-badge
     :target: https://pystematic.readthedocs.io
+
 
 Pystematic is a lightweight framework that helps you to systematically setup and
 run reproducible computational experiments in python. 
