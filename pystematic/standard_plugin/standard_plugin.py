@@ -166,6 +166,8 @@ class StandardApi:
         
         if error is not None:
             logger.error(f"Experiment ended with an error.", exc_info=error)
+        else:
+            logger.info(f"Experiment ended.")
 
         self._log_handler.close()
 
