@@ -1,25 +1,22 @@
-import wrapt
-import pathlib
-import random
+import datetime
+import functools
+import itertools
 import logging
 import multiprocessing
 import multiprocessing.connection
-import datetime
+import pathlib
+import random
 import string
-import functools
-import itertools
-import time
 
-from rich.console import Console
-from rich.theme import Theme
-from rich.markup import escape
-
-from . import yaml_wrapper as yaml
+import pystematic
 import pystematic.core as core
+import wrapt
+from rich.console import Console
+from rich.markup import escape
+from rich.theme import Theme
 
 from .. import parametric
-import pystematic
-
+from . import yaml_wrapper as yaml
 
 logger = logging.getLogger('pystematic.standard')
 
@@ -91,8 +88,6 @@ class StandardLogHandler(logging.Handler):
         level = f"[{record.levelname.lower()}]{level_str}[/{record.levelname.lower()}]"
         msg = f"{record.getMessage()}"
 
-        
-
         name = f"[name]\[{record.name}][/name]"
         
         time_str = datetime.datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S')
@@ -152,7 +147,7 @@ class StandardApi:
             self.output_dir.__wrapped__ = _create_log_dir_name(params["output_dir"], experiment.name)
             self.params_file.__wrapped__ = self.output_dir.joinpath("parameters.yaml")
         
-            self.output_dir.mkdir(parents=True, exist_ok=True)
+            self.output_dir.mkdir(parents=True, exist_ok=False)
 
             self._log_handler = StandardLogHandler(_get_log_file_name(self.output_dir, params["local_rank"]))
             logging.basicConfig(level=log_level, handlers=[self._log_handler], force=True)
@@ -163,11 +158,12 @@ class StandardApi:
                 yaml.dump(params, f)
         
     def _after_experiment(self, error=None):
-        
+        end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
         if error is not None:
-            logger.error(f"Experiment ended with an error.", exc_info=error)
+            logger.error(f"Experiment ended at {end_time} with an error: {error}", exc_info=error)
         else:
-            logger.info(f"Experiment ended.")
+            logger.info(f"Experiment ended at {end_time}.")
 
         self._log_handler.close()
 
