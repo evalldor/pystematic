@@ -124,23 +124,8 @@ class PystematicApp:
     def after_experiment(self, error):
         """Triggers the after_experiment event. Internal.
         """
-        
         for callback, priority in sorted(self._after_experiment_callbacks, key=lambda x: x[1]):
-            # for backwards compatibility
-            has_new_signature = False
-            sig = inspect.signature(callback)
-            
-            for name, param in sig.parameters.items():
-                if param.kind not in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD):
-                    has_new_signature = True
-                    break
-
-            if has_new_signature:
-                callback(error)
-            else:
-                warnings.warn(f"Callback {callback.__qualname__} has an old signature which "
-                            "will be deprecated in a future release.", DeprecationWarning)
-                callback()
+            callback(error)
 
         self._active_experiment = None
 
