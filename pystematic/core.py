@@ -95,7 +95,8 @@ class PystematicApp:
 
         Args:
             callback (function): A function that is called before an experiment is run. 
-                The callback is not given any arguments.
+                The callback must take a single argument which is the error that caused the 
+                experiment to end, or None if the experiment ended normally.
             priority (int, optional): The priority of the callback. Callbacks with lower priority 
                 are called before those with higher. Defaults to 50.
         """
