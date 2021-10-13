@@ -85,15 +85,17 @@ class StandardLogHandler(logging.Handler):
 
     def handle(self, record):
         level_str = escape(f"[{record.levelname}]")
-        level = f"[{record.levelname.lower()}]{level_str}[/{record.levelname.lower()}]"
-        msg = f"{record.getMessage()}"
 
-        name = f"[name]\[{record.name}][/name]"
+        level = f"[{record.levelname.lower()}]{level_str}[/{record.levelname.lower()}]"
+        
+        msg = escape(f"{record.getMessage()}")
+
+        name = "[name]" + escape(f'[{record.name}]') + "[/name]"
         
         time_str = datetime.datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S')
 
         if pystematic.local_rank() > 0 or pystematic.subprocess_counter > 0:
-            rank = f"[rank][RANK {pystematic.local_rank()}][/rank]"
+            rank = "[rank]" + escape(f"[RANK {pystematic.local_rank()}]") + "[/rank]"
 
             self.console_output.print(f"{level} {rank} {name} {msg}")
             self.file_output.print(f"[{time_str}] {level} {rank} {name} {msg}")
