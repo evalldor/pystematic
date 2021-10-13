@@ -317,7 +317,12 @@ class Experiment:
         try:
             self.main_function(params)
         except BaseException as e:
-            app.after_experiment(e)
+            
+            if isinstance(e, SystemExit) and e.code == 0:
+                app.after_experiment(None)
+            else:
+                app.after_experiment(e)
+
             raise e
         else:
             app.after_experiment(None)
