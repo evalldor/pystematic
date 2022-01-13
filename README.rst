@@ -55,12 +55,11 @@ experiment. The following example defines an experiment named ``hello_world``
 with a single parameter ``name``:
 
 .. code-block:: python
-
+    import pystematic as ps
+    
     @ps.parameter(
         name="name",
-        type=str,
         help="The name to greet.",
-        required=True
     )
     @ps.experiment
     def hello_world(params):
