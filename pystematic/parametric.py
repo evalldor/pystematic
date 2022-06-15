@@ -651,6 +651,14 @@ class ParameterManager:
             if param.required and result_dict[param.name] is None:
                 raise ValidationError(f"Parameter '{param.name}' is required.")
 
+    def fail_on_unknown_values(self, result_dict):
+        all_param_names = [param.name for param in self.get_all_parameters()]
+        
+        for name in result_dict.keys():
+            
+            if name not in all_param_names:
+                raise ValidationError(f"'{name}' is not a recognized parameter name.")
+
     def from_cli(self, argv=None, defaults=True, env=True):
         result_dict = _ParamValueDict(self.get_parameters())
 
@@ -691,16 +699,22 @@ class ParameterManager:
 
         return dict(result_dict), argv_rest
 
-    def from_dict(self, values, defaults=True, env=True):
+    def from_dict(self, values, defaults=True, env=True, fail_on_unknown_values=False):
+        if(fail_on_unknown_values):
+            self.fail_on_unknown_values(values)
+
         result_dict = _ParamValueDict(self.get_parameters())
 
         self.add_dict_values(values, result_dict)
 
         if env:
             self.add_env_values(result_dict)
+
         if defaults:
             self.add_defaults(result_dict)
         
+        
+
         self.validate_values(result_dict)
 
         return dict(result_dict)

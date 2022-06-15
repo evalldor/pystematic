@@ -259,7 +259,11 @@ class Experiment:
         Args:
             params (dict, optional): A dict containing values for the parameters. Defaults to {}.
         """
-        param_values = self.param_manager.from_dict(params)
+        try:
+            param_values = self.param_manager.from_dict(params, fail_on_unknown_values=True)
+        except Exception as e:
+            raise Error(e) from e
+            
         self._run_experiment(param_values)
 
     def cli(self, argv=None, exit_on_error=True):

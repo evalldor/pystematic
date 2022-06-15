@@ -1,5 +1,6 @@
 import time
 import pathlib
+from pystematic.parametric import ValidationError
 import pytest
 import pystematic
 import pystematic.core
@@ -706,3 +707,17 @@ def test_load_param_file():
         exp2.run({
             "params_file": "tests/resources/params2.yaml"
         })
+
+
+def test_experiment_fails_on_unknown_parameter():
+
+    @pystematic.parameter(
+        name="test_param"
+    )
+    @pystematic.experiment
+    def exp(params):
+        pass
+
+
+    with pytest.raises(pystematic.core.Error):
+        exp.run({"test_param": "test", "invalid_param": 3})
