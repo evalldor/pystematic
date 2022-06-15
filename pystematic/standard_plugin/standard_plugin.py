@@ -104,7 +104,7 @@ class StandardLogHandler(logging.Handler):
             self.file_output.print(f"[{time_str}] {level} {name} {msg}")
         
         if record.exc_info:
-            self.console_output.print_exception(show_locals=True, suppress=[core])
+            # self.console_output.print_exception(show_locals=True, suppress=[core])
             self.file_output.print_exception(show_locals=True, suppress=[core])
 
     def close(self):
