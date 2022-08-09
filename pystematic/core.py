@@ -286,6 +286,7 @@ class Experiment:
         except Exception as e:
             if exit_on_error:
                 self.param_manager.print_error(e)
+                self.param_manager.print_cli_help()
                 sys.exit(1)
             else:
                 raise Error(e) from e
@@ -490,6 +491,7 @@ class ExperimentGroup:
         except Exception as e:
             if exit_on_error:
                 self.param_manager.print_error(e)
+                self.param_manager.print_cli_help()
                 sys.exit(1)
             else:
                 raise Error(e) from e
