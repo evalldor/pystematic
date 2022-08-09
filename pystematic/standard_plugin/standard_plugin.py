@@ -50,7 +50,7 @@ def _create_log_dir_name(output_dir, experiment_name):
 
     chars = string.digits + string.ascii_lowercase # + string.ascii_uppercase
     suffix = "".join(random.SystemRandom().choice(chars) for _ in range(6))
-    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(f"{current_time}-{suffix}")
+    directory = pathlib.Path(output_dir).resolve().joinpath(experiment_name).joinpath(f"{current_time}_{suffix}")
 
     return directory
 
