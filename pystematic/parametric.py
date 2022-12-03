@@ -186,10 +186,10 @@ class Parameter:
         # Validate name
         #
         if not isinstance(name, str):
-            raise ParamInitError("Invalid name '{name}': expected a string.")
+            raise ParamInitError(f"Invalid name '{name}': expected a string.")
 
         if not name.isidentifier():
-            raise ParamInitError("Invalid name '{name}': must be a valid python identifier.")
+            raise ParamInitError(f"Invalid name '{name}': must be a valid python identifier.")
         
         #
         # Validate flags
@@ -230,7 +230,7 @@ class Parameter:
             type = BooleanType()
 
         if not callable(type):
-            raise ParamInitError("Invalid type '{type}': must be a callable.")
+            raise ParamInitError(f"Invalid type '{type}': must be a callable.")
 
         
 
